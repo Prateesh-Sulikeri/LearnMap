@@ -23,6 +23,7 @@
     --color-success: var(--success);
     --color-warning: var(--warning);
     --color-accent-hover: var(--accent-hover);
+    --color-tree-line: var(--tree-line);
 
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -85,6 +86,8 @@
     --border: #EAE7DC;
     --input: #EAE7DC;
     --ring: #EAB308;
+    /* Tree connector lines need more visibility than the subtle card border — a step darker, still warm-neutral. */
+    --tree-line: #A39C89;
 
     /* Semantic */
     --success: #22C55E;

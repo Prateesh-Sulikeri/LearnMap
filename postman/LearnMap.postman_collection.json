@@ -1042,6 +1042,118 @@
       ]
     },
     {
+      "name": "Trash & Restore (Alice)",
+      "item": [
+        {
+          "name": "Delete Root Item (soft-delete, cascades)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('deleted_count is 2 (Backend + Kafka)', () => pm.expect(pm.response.json().deleted_count).to.eql(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items/{{root_item_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "items", "{{root_item_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Trash (expect only the root, not its cascaded child)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('exactly one trash root', () => pm.expect(body).to.be.an('array').with.lengthOf(1));",
+                  "pm.test('it is the deleted root item, not the cascaded child', () => pm.expect(body[0].id).to.eql(pm.collectionVariables.get('root_item_id')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items/trash", "host": ["{{base_url}}"], "path": ["api", "v1", "items", "trash"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Restore Root Item (brings back Kafka too)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('restored_count is 2 (Backend + Kafka)', () => pm.expect(pm.response.json().restored_count).to.eql(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items/{{root_item_id}}/restore", "host": ["{{base_url}}"], "path": ["api", "v1", "items", "{{root_item_id}}", "restore"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Items (expect both back)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('both items restored', () => pm.expect(pm.response.json()).to.be.an('array').with.lengthOf(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Trash (expect empty again)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('empty after restore', () => pm.expect(pm.response.json()).to.be.an('array').that.is.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items/trash", "host": ["{{base_url}}"], "path": ["api", "v1", "items", "trash"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Cleanup (Alice) — cascade delete",
       "item": [
         {

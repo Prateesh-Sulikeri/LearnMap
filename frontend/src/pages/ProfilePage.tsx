@@ -62,7 +62,7 @@ export default function ProfilePage() {
   if (!user) return null
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="mx-auto max-w-lg space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="font-heading">Profile</CardTitle>

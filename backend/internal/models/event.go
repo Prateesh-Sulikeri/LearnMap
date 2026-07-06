@@ -15,6 +15,7 @@ const (
 	EventTaskReopened   EventType = "TASK_REOPENED"
 	EventTaskUpdated    EventType = "TASK_UPDATED"
 	EventTaskDeleted    EventType = "TASK_DELETED"
+	EventTaskRestored   EventType = "TASK_RESTORED"
 	EventItemRenamed    EventType = "ITEM_RENAMED"
 	EventSessionAdded   EventType = "SESSION_ADDED"
 	EventSessionDeleted EventType = "SESSION_DELETED"

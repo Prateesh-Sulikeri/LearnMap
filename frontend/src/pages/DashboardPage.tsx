@@ -4,7 +4,6 @@ import { CalendarClock, CheckCircle2, Flame, ListTodo } from 'lucide-react'
 import { dashboardApi } from '@/services/dashboardApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ProgressTree } from '@/components/ProgressTree'
 
 interface StatCardProps {
   label: string
@@ -121,15 +120,6 @@ export default function DashboardPage() {
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-base">Progress by topic</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ProgressTree />
         </CardContent>
       </Card>
     </div>

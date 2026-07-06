@@ -167,6 +167,40 @@ func (s *LearningItemService) Delete(userID, itemID uuid.UUID) (int, error) {
 	return len(toDelete), nil
 }
 
+// ListTrash returns the user's "trash roots" — see
+// LearningItemRepository.ListDeletedRootsByUser for exactly what that means.
+func (s *LearningItemService) ListTrash(userID uuid.UUID) ([]models.LearningItem, error) {
+	return s.items.ListDeletedRootsByUser(userID)
+}
+
+// Restore undoes a soft-delete: itemID and every descendant that was
+// deleted along with it (mirroring Delete's cascade) come back, along with
+// their study sessions. Returns how many items were restored.
+func (s *LearningItemService) Restore(userID, itemID uuid.UUID) (int, error) {
+	item, err := s.items.GetDeletedByID(userID, itemID)
+	if err != nil {
+		return 0, err
+	}
+	if item == nil {
+		return 0, apperror.NotFound("deleted item not found")
+	}
+
+	all, err := s.items.ListAllIncludingDeletedByUser(userID)
+	if err != nil {
+		return 0, err
+	}
+
+	toRestore := collectSubtreeIDs(all, itemID)
+
+	if err := s.items.RestoreItems(userID, toRestore); err != nil {
+		return 0, err
+	}
+
+	_ = s.events.Record(userID, models.EventTaskRestored, models.EntityLearningItem, itemID, map[string]interface{}{"restored_count": len(toRestore)})
+
+	return len(toRestore), nil
+}
+
 // collectSubtreeIDs returns rootID plus every descendant id, found by walking
 // the flat item list in memory — the dataset is small (a single user's
 // tree), so this avoids a recursive SQL CTE for no real benefit (ADR-001).

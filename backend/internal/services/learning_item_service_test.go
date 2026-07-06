@@ -126,6 +126,66 @@ func TestLearningItemService_Update_EmitsRenameOnlyWhenTitleChanges(t *testing.T
 	require.Equal(t, "Apache Kafka", updated.Title)
 }
 
+func TestLearningItemService_Restore_BringsBackWholeSubtreeAndSessions(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	parent, err := deps.items.Create(userA, services.CreateItemInput{Title: "Backend"})
+	require.NoError(t, err)
+	child, err := deps.items.Create(userA, services.CreateItemInput{Title: "Kafka", ParentID: &parent.ID})
+	require.NoError(t, err)
+
+	session := &models.StudySession{UserID: userA, LearningItemID: child.ID, Hours: 1, SessionDate: time.Now()}
+	require.NoError(t, deps.sessions.Create(session))
+
+	deletedCount, err := deps.items.Delete(userA, parent.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, deletedCount)
+
+	trash, err := deps.items.ListTrash(userA)
+	require.NoError(t, err)
+	require.Len(t, trash, 1, "only the explicitly-deleted root should show in trash, not its cascaded child")
+	require.Equal(t, parent.ID, trash[0].ID)
+
+	restoredCount, err := deps.items.Restore(userA, parent.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, restoredCount, "parent + child should both come back")
+
+	gotParent, err := deps.itemRepo.GetByID(userA, parent.ID)
+	require.NoError(t, err)
+	require.NotNil(t, gotParent, "parent must be retrievable again")
+
+	gotChild, err := deps.itemRepo.GetByID(userA, child.ID)
+	require.NoError(t, err)
+	require.NotNil(t, gotChild, "child must be restored along with its parent")
+
+	gotSession, err := deps.sessions.GetByID(userA, session.ID)
+	require.NoError(t, err)
+	require.NotNil(t, gotSession, "the session must be restored too")
+
+	trashAfterRestore, err := deps.items.ListTrash(userA)
+	require.NoError(t, err)
+	require.Empty(t, trashAfterRestore)
+}
+
+func TestLearningItemService_Restore_RejectsAnotherUsersDeletedItem(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+	userB := createUser("bob@example.com")
+
+	item, err := deps.items.Create(userA, services.CreateItemInput{Title: "Alice's item"})
+	require.NoError(t, err)
+	_, err = deps.items.Delete(userA, item.ID)
+	require.NoError(t, err)
+
+	_, err = deps.items.Restore(userB, item.ID)
+	require.Error(t, err, "Bob must not be able to restore Alice's deleted item")
+
+	got, err := deps.itemRepo.GetByID(userA, item.ID)
+	require.NoError(t, err)
+	require.Nil(t, got, "the item must remain deleted after Bob's failed restore attempt")
+}
+
 func TestLearningItemService_GetByID_ReturnsNilNotErrorForMissingOrForeignItem(t *testing.T) {
 	deps, createUser := setupItemService(t)
 	userA := createUser("alice@example.com")

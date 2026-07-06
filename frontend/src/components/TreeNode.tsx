@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Circle, CircleCheck, Clock, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, Circle, CircleCheck, Clock, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { itemsApi } from '@/services/itemsApi'
 import { getApiErrorMessage } from '@/utils/apiError'
@@ -8,6 +8,12 @@ import type { LearningTreeNode } from '@/utils/tree'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { TreeGuides } from '@/components/tree/TreeGuides'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
 import { DeleteItemDialog } from '@/components/DeleteItemDialog'
@@ -22,40 +28,6 @@ interface TreeNodeProps {
   isLast: boolean
   /** Ancestor continuation guides inherited from the parent (see TreeGuides). */
   ancestorLines: boolean[]
-}
-
-function ActionIcon({
-  label,
-  onClick,
-  variant = 'ghost',
-  children,
-}: {
-  label: string
-  onClick: () => void
-  variant?: 'ghost' | 'destructive-ghost'
-  children: React.ReactNode
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              'size-7 shrink-0',
-              variant === 'destructive-ghost' && 'text-destructive hover:bg-destructive/10 hover:text-destructive',
-            )}
-            aria-label={label}
-            onClick={onClick}
-          />
-        }
-      >
-        {children}
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  )
 }
 
 // Indentation shrinks on phone widths (1rem/level vs 1.5rem on tablet+) so
@@ -134,20 +106,38 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, isLast, ancestorL
           </button>
         </div>
 
-        <div className="flex shrink-0 items-center gap-0.5">
-          <ActionIcon label="Log a session" onClick={() => setLogSessionOpen(true)}>
-            <Clock className="size-4" />
-          </ActionIcon>
-          <ActionIcon label="Add sub-item" onClick={() => setAddChildOpen(true)}>
-            <Plus className="size-4" />
-          </ActionIcon>
-          <ActionIcon label="Rename" onClick={() => setRenameOpen(true)}>
-            <Pencil className="size-4" />
-          </ActionIcon>
-          <ActionIcon label="Delete" variant="destructive-ghost" onClick={() => setDeleteOpen(true)}>
-            <Trash2 className="size-4" />
-          </ActionIcon>
-        </div>
+        <Tooltip>
+          <TooltipTrigger render={<span className="inline-flex" />}>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={`Actions for ${node.title}`} />
+                }
+              >
+                <MoreHorizontal className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setLogSessionOpen(true)} className="flex items-center gap-3">
+                  <Clock className="size-4" />
+                  Log a session
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setAddChildOpen(true)} className="flex items-center gap-3">
+                  <Plus className="size-4" />
+                  Add sub-item
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setRenameOpen(true)} className="flex items-center gap-3">
+                  <Pencil className="size-4" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)} className="flex items-center gap-3">
+                  <Trash2 className="size-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TooltipTrigger>
+          <TooltipContent>More actions for this item</TooltipContent>
+        </Tooltip>
       </div>
 
       {hasChildren && !collapsed && (
@@ -166,7 +156,14 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, isLast, ancestorL
         </ul>
       )}
 
-      <ItemFormDialog open={renameOpen} onOpenChange={setRenameOpen} mode="rename" itemId={node.id} initialTitle={node.title} />
+      <ItemFormDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        mode="rename"
+        itemId={node.id}
+        initialTitle={node.title}
+        initialDescription={node.description}
+      />
       <ItemFormDialog open={addChildOpen} onOpenChange={setAddChildOpen} mode="create" parentId={node.id} />
       <AddSessionDialog open={logSessionOpen} onOpenChange={setLogSessionOpen} defaultItemId={node.id} />
       <DeleteItemDialog

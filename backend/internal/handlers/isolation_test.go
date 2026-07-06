@@ -153,6 +153,53 @@ func TestCrossUserIsolation_Sessions(t *testing.T) {
 	require.Len(t, sessions, 1)
 }
 
+func TestCrossUserIsolation_Trash(t *testing.T) {
+	router := newTestRouter(t)
+
+	aliceToken := registerUser(t, router, "alice-trash@example.com", "Alice")
+	bobToken := registerUser(t, router, "bob-trash@example.com", "Bob")
+
+	itemID := createItem(t, router, aliceToken, "Alice's item")
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+itemID, nil)
+	deleteReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	deleteRec := httptest.NewRecorder()
+	router.ServeHTTP(deleteRec, deleteReq)
+	require.Equal(t, http.StatusOK, deleteRec.Code)
+
+	// Bob's trash must not show Alice's deleted item.
+	trashReq := httptest.NewRequest(http.MethodGet, "/api/v1/items/trash", nil)
+	trashReq.Header.Set("Authorization", "Bearer "+bobToken)
+	trashRec := httptest.NewRecorder()
+	router.ServeHTTP(trashRec, trashReq)
+	require.Equal(t, http.StatusOK, trashRec.Code)
+
+	var bobTrash []interface{}
+	require.NoError(t, json.Unmarshal(trashRec.Body.Bytes(), &bobTrash))
+	require.Empty(t, bobTrash, "Bob must not see Alice's deleted items in his trash")
+
+	// Bob must not be able to restore Alice's deleted item by guessing its id.
+	restoreReq := httptest.NewRequest(http.MethodPost, "/api/v1/items/"+itemID+"/restore", nil)
+	restoreReq.Header.Set("Authorization", "Bearer "+bobToken)
+	restoreRec := httptest.NewRecorder()
+	router.ServeHTTP(restoreRec, restoreReq)
+	require.Equal(t, http.StatusNotFound, restoreRec.Code, "Bob must not be able to restore Alice's deleted item")
+
+	// Confirm Alice's item is still in her own trash, unaffected.
+	trashReq = httptest.NewRequest(http.MethodGet, "/api/v1/items/trash", nil)
+	trashReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	trashRec = httptest.NewRecorder()
+	router.ServeHTTP(trashRec, trashReq)
+	require.Equal(t, http.StatusOK, trashRec.Code)
+
+	var aliceTrash []struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.Unmarshal(trashRec.Body.Bytes(), &aliceTrash))
+	require.Len(t, aliceTrash, 1)
+	require.Equal(t, itemID, aliceTrash[0].ID)
+}
+
 func TestUnauthenticatedRequestsAreRejected(t *testing.T) {
 	router := newTestRouter(t)
 

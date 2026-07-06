@@ -1,0 +1,84 @@
+/*
+ * The classic "pure CSS org chart" tree pattern: a top-down diagram (root at
+ * top, children spread horizontally below, connected by lines), built from
+ * plain nested <ul>/<li> with pseudo-element connectors — no measuring, no
+ * JS layout math. Used for the Study Sessions "progress by topic" tree,
+ * which the Learning tab's indented-list tree intentionally does NOT use
+ * (different job: browsing/editing a possibly-deep hierarchy vs. a quick
+ * visual glance at what's done).
+ */
+
+.org-tree,
+.org-tree ul {
+  display: flex;
+  justify-content: center;
+  padding-top: 1.5rem;
+  position: relative;
+}
+
+.org-tree {
+  padding-top: 0;
+}
+
+.org-tree li {
+  list-style: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 0.75rem 0 0.75rem;
+}
+
+.org-tree > li {
+  padding-top: 0;
+}
+
+.org-tree li::before,
+.org-tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 1.5rem;
+  border-top: 1px solid var(--tree-line);
+}
+
+.org-tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1px solid var(--tree-line);
+}
+
+.org-tree li:only-child::before,
+.org-tree li:only-child::after {
+  display: none;
+}
+
+.org-tree li:only-child {
+  padding-top: 0;
+}
+
+.org-tree li:first-child::before,
+.org-tree li:last-child::after {
+  border: none;
+}
+
+.org-tree li:last-child::before {
+  border-right: 1px solid var(--tree-line);
+  border-radius: 0 var(--radius-sm) 0 0;
+}
+
+.org-tree li:first-child::after {
+  border-radius: var(--radius-sm) 0 0 0;
+}
+
+.org-tree ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 1.5rem;
+  border-left: 1px solid var(--tree-line);
+}

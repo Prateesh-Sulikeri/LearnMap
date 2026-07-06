@@ -199,3 +199,58 @@ func (h *LearningItemHandler) Delete(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"deleted_count": count})
 }
+
+type trashedItemResponse struct {
+	ID          string  `json:"id"`
+	ParentID    *string `json:"parent_id"`
+	Title       string  `json:"title"`
+	Description *string `json:"description"`
+	Status      string  `json:"status"`
+	DeletedAt   string  `json:"deleted_at"`
+}
+
+func toTrashedItemResponse(item *models.LearningItem) trashedItemResponse {
+	var parentID *string
+	if item.ParentID != nil {
+		s := item.ParentID.String()
+		parentID = &s
+	}
+	return trashedItemResponse{
+		ID:          item.ID.String(),
+		ParentID:    parentID,
+		Title:       item.Title,
+		Description: item.Description,
+		Status:      string(item.Status),
+		DeletedAt:   item.DeletedAt.Time.Format(time.RFC3339),
+	}
+}
+
+func (h *LearningItemHandler) ListTrash(c *gin.Context) {
+	userID := middleware.UserIDFromContext(c)
+	items, err := h.service.ListTrash(userID)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	responses := make([]trashedItemResponse, 0, len(items))
+	for i := range items {
+		responses = append(responses, toTrashedItemResponse(&items[i]))
+	}
+	c.JSON(http.StatusOK, responses)
+}
+
+func (h *LearningItemHandler) Restore(c *gin.Context) {
+	userID := middleware.UserIDFromContext(c)
+	itemID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		RespondValidationError(c, errors.New("invalid item id"))
+		return
+	}
+
+	count, svcErr := h.service.Restore(userID, itemID)
+	if svcErr != nil {
+		RespondError(c, svcErr)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"restored_count": count})
+}

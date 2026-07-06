@@ -70,3 +70,67 @@ func (r *LearningItemRepository) SoftDeleteWithSessions(userID uuid.UUID, itemID
 			Update("deleted_at", now).Error
 	})
 }
+
+// GetDeletedByID returns a soft-deleted item (Unscoped so the normal
+// not-deleted query scope doesn't hide it), or nil if it doesn't exist,
+// belongs to another user, or isn't actually deleted — same "don't
+// distinguish the reasons" rule as GetByID (ADR-016).
+func (r *LearningItemRepository) GetDeletedByID(userID, itemID uuid.UUID) (*models.LearningItem, error) {
+	var item models.LearningItem
+	err := r.db.Unscoped().
+		Where("id = ? AND user_id = ? AND deleted_at IS NOT NULL", itemID, userID).
+		First(&item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+// ListDeletedRootsByUser returns only the "trash roots" — deleted items
+// whose parent is either absent or not itself deleted. A cascade delete
+// soft-deletes an entire subtree at once, but the trash view should show
+// only what the user actually clicked delete on, not every descendant that
+// came along with it.
+func (r *LearningItemRepository) ListDeletedRootsByUser(userID uuid.UUID) ([]models.LearningItem, error) {
+	var items []models.LearningItem
+	err := r.db.Unscoped().
+		Where(`user_id = ? AND deleted_at IS NOT NULL AND (
+			parent_id IS NULL OR EXISTS (
+				SELECT 1 FROM learning_items parent
+				WHERE parent.id = learning_items.parent_id AND parent.deleted_at IS NULL
+			)
+		)`, userID).
+		Order("deleted_at desc").
+		Find(&items).Error
+	return items, err
+}
+
+// ListAllIncludingDeletedByUser returns every item regardless of soft-delete
+// status — used to walk the full parent/child map (via collectSubtreeIDs)
+// when restoring a subtree that was deleted together.
+func (r *LearningItemRepository) ListAllIncludingDeletedByUser(userID uuid.UUID) ([]models.LearningItem, error) {
+	var items []models.LearningItem
+	err := r.db.Unscoped().Where("user_id = ?", userID).Find(&items).Error
+	return items, err
+}
+
+// RestoreItems clears deleted_at for every item in itemIDs and any
+// study_sessions logged against them — the mirror of SoftDeleteWithSessions.
+func (r *LearningItemRepository) RestoreItems(userID uuid.UUID, itemIDs []uuid.UUID) error {
+	if len(itemIDs) == 0 {
+		return nil
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(&models.StudySession{}).
+			Where("user_id = ? AND learning_item_id IN ?", userID, itemIDs).
+			Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+		return tx.Unscoped().Model(&models.LearningItem{}).
+			Where("user_id = ? AND id IN ?", userID, itemIDs).
+			Update("deleted_at", nil).Error
+	})
+}
