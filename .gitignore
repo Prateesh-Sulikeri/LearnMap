@@ -1,0 +1,23 @@
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+
+# Go / backend
+backend/tmp/
+backend/*.exe
+backend/*.test
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude Code session state (ephemeral, machine-specific)
+.claude/scheduled_tasks.lock

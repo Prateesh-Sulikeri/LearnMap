@@ -1,0 +1,269 @@
+# LearnMap.app — Architecture
+
+Status: **Milestone 1 complete** (backend foundation + auth) — implemented, tested, and reviewed. Milestone 2 (frontend) not yet started.
+
+> **Scope note (2026-07-06):** the original design document (`docs/DD_v1.pdf`) specified a local, single-user, SQLite-backed tool with no auth. The user has since directed that LearnMap.app be **hosted, multi-user, with authentication and profiles**, usable from a phone and a laptop, with pilot testing across multiple people and screen sizes. This document reflects the updated scope. See `docs/DECISIONS.md` ADR-007 onward.
+
+## 1. System Overview
+
+```
+┌──────────────────┐        HTTPS/JSON        ┌──────────────────────┐        ┌────────────────┐
+│  frontend (SPA)   │ ───────────────────────► │   backend (Gin)      │───────►│  PostgreSQL     │
+│  React + TS        │ ◄─────────────────────── │   Go                 │◄───────│  (managed)      │
+│  phone + laptop    │   Bearer JWT + httpOnly  │   /api/v1/*          │  GORM  │                 │
+└──────────────────┘   refresh cookie          └──────────────────────┘        └────────────────┘
+```
+
+Frontend and backend remain independently deployable. The backend is now the sole authority on identity (auth) and data ownership (every row is scoped to a `user_id`).
+
+## 2. Backend Architecture (layered)
+
+```
+cmd/
+  server/main.go            entrypoint: load config, init DB, build router, run
+
+internal/
+  models/                   GORM structs — owned by database-agent
+    user.go
+    refresh_token.go
+    learning_item.go
+    study_session.go
+    event.go
+
+  database/                 connection, PRAGMAs/pooling — owned by database-agent
+    connection.go
+  migrations/                versioned SQL migrations (golang-migrate/goose) — owned by database-agent
+
+  apperror/                  typed service-layer errors (Validation/NotFound/Unauthorized/Conflict);
+                              handlers translate these into the standard JSON error envelope
+
+  repositories/              ONLY layer touching the DB — owned by backend-agent
+    user_repository.go
+    refresh_token_repository.go
+    learning_item_repository.go
+    study_session_repository.go
+    event_repository.go
+
+  services/                  ALL business logic lives here — owned by backend-agent
+    auth_service.go            (register/login/refresh/logout, bcrypt, JWT)
+    profile_service.go
+    learning_item_service.go   (hierarchy validation, cascade soft-delete, status transitions)
+    study_session_service.go   (session CRUD, streak calc)
+    dashboard_service.go       (aggregation: weekly hours, completion %, top topics)
+    event_service.go           (append-only event log writer)
+
+  handlers/                  HTTP only: parse request → call service → write response
+    auth_handler.go
+    profile_handler.go
+    learning_item_handler.go
+    study_session_handler.go
+    dashboard_handler.go
+    health_handler.go
+
+  routes/
+    routes.go                  route table; public routes (auth) vs. protected routes (auth middleware required)
+
+  middleware/
+    cors.go
+    auth.go                    verifies JWT, injects user_id into context; 401 on failure
+    rate_limit.go               IP-based limiter on /auth/login, /auth/register
+    logging.go
+    recovery.go
+    error_handler.go
+
+  config/
+    config.go                  env-driven config (port, DATABASE_URL, JWT_SECRET, CORS origins)
+
+  testutil/                  test-only: real (not mocked) Postgres connection + truncate helper for tests
+```
+
+Key dependencies (Milestone 1): `gin-gonic/gin`, `gorm.io/gorm` + `gorm.io/driver/postgres`, `golang-jwt/jwt/v5`, `golang.org/x/crypto/bcrypt`, `golang.org/x/time/rate` (auth rate limiting), `golang-migrate/migrate/v4` (SQL source), `google/uuid`, `gorm.io/datatypes` (JSONB), `joho/godotenv` (local dev only).
+
+**Rule enforced every milestone (self-reviewed for M1, no separate agent process available in this environment):** handlers never import GORM directly; repositories never contain conditional business rules; every user-owned-table query is scoped by `user_id` from the auth context — never from client input. Verified in Milestone 1 by an automated cross-user isolation test (`internal/handlers/isolation_test.go`) in addition to manual end-to-end verification.
+
+## 3. Frontend Architecture
+
+```
+frontend/src/
+  components/        reusable UI primitives (Card, StatTile, TreeNode, ConfirmDialog, EmptyState...)
+  pages/              Login, Register, Dashboard, LearningTree, StudySessions, Profile
+  layouts/            AppLayout (nav + search bar + breadcrumb + floating add button); AuthLayout
+  routes/              route table incl. a ProtectedRoute wrapper (redirect to /login if unauthenticated)
+  hooks/               useAuth, useLearningTree, useDashboard, useStreak, useCollapsedState (localStorage)
+  services/            one file per API resource; TanStack Query hooks + Axios calls live here ONLY
+    authApi.ts          register/login/refresh/logout/me — manages access token in memory
+    itemsApi.ts
+    sessionsApi.ts
+    dashboardApi.ts
+    profileApi.ts
+    client.ts            axios instance: attaches Bearer token, `withCredentials: true` for the refresh cookie, 401 → single silent refresh attempt → else logout
+  types/               shared TS types mirroring the API contract
+  utils/               pure helpers (date formatting, tree flatten/assemble, hours formatting)
+```
+
+**Responsive is a first-class requirement starting Milestone 2**, not deferred polish — every page must be verified at phone (~375–430px), tablet (~768px), and laptop (~1280px+) widths before being considered done.
+
+## 4. Database Schema (PostgreSQL)
+
+UUID primary keys throughout (ADR-008). Soft deletes (`deleted_at`) on user-owned mutable tables (ADR-003). Every user-owned table carries `user_id` directly, even where derivable via a join — defense in depth (ADR-011).
+
+### `users`
+
+| Column         | Type          | Notes                                  |
+|----------------|---------------|------------------------------------------|
+| id             | UUID PK       | `gen_random_uuid()`                       |
+| email          | TEXT UNIQUE   | NOT NULL                                  |
+| password_hash  | TEXT          | NOT NULL (bcrypt)                         |
+| display_name   | TEXT          | NOT NULL                                  |
+| avatar_url     | TEXT          | nullable                                  |
+| created_at     | TIMESTAMPTZ   | NOT NULL DEFAULT now()                    |
+| updated_at     | TIMESTAMPTZ   | NOT NULL DEFAULT now()                    |
+
+### `refresh_tokens`
+
+| Column       | Type        | Notes                                    |
+|--------------|-------------|---------------------------------------------|
+| id           | UUID PK     |                                               |
+| user_id      | UUID FK     | → users.id                                   |
+| token_hash   | TEXT        | NOT NULL — hash of the token, never plaintext|
+| expires_at   | TIMESTAMPTZ | NOT NULL                                     |
+| created_at   | TIMESTAMPTZ | NOT NULL DEFAULT now()                       |
+| revoked_at   | TIMESTAMPTZ | nullable                                     |
+
+Index: `(user_id)`, `(token_hash)`.
+
+### `learning_items`
+
+| Column        | Type        | Notes                                                              |
+|---------------|-------------|-----------------------------------------------------------------------|
+| id            | UUID PK     |                                                                         |
+| user_id       | UUID FK     | → users.id, NOT NULL                                                   |
+| parent_id     | UUID        | FK → learning_items.id, NULL = root. Must belong to the same user_id.  |
+| title         | TEXT        | NOT NULL                                                               |
+| description   | TEXT        | nullable                                                               |
+| status        | TEXT        | NOT NULL DEFAULT 'not_started'; CHECK IN ('not_started','in_progress','completed') |
+| deadline      | TIMESTAMPTZ | nullable                                                               |
+| position      | INTEGER     | NOT NULL DEFAULT 0 — sibling ordering, future drag-reorder ready       |
+| created_at    | TIMESTAMPTZ | NOT NULL DEFAULT now()                                                 |
+| updated_at    | TIMESTAMPTZ | NOT NULL DEFAULT now()                                                 |
+| completed_at  | TIMESTAMPTZ | nullable                                                               |
+| deleted_at    | TIMESTAMPTZ | nullable — soft delete                                                 |
+
+Indexes: `(user_id)`, `(user_id, parent_id)`, `(user_id, status)`, `(deleted_at)`.
+
+### `study_sessions`
+
+| Column            | Type        | Notes                                        |
+|-------------------|-------------|-------------------------------------------------|
+| id                | UUID PK     |                                                    |
+| user_id           | UUID FK     | → users.id, NOT NULL (denormalized, ADR-011)      |
+| learning_item_id  | UUID FK     | → learning_items.id, NOT NULL                     |
+| hours             | REAL        | NOT NULL, CHECK (hours > 0 AND hours <= 24)       |
+| notes             | TEXT        | nullable                                           |
+| session_date      | DATE        | NOT NULL                                           |
+| created_at        | TIMESTAMPTZ | NOT NULL DEFAULT now()                             |
+| deleted_at        | TIMESTAMPTZ | nullable — soft delete                             |
+
+Indexes: `(user_id)`, `(user_id, session_date)`, `(learning_item_id)`.
+
+### `events` (append-only, not exposed via API — future AI hook)
+
+| Column       | Type        | Notes                                                                 |
+|--------------|-------------|---------------------------------------------------------------------------|
+| id           | UUID PK     |                                                                             |
+| user_id      | UUID FK     | → users.id, NOT NULL                                                       |
+| event_type   | TEXT        | TASK_CREATED, TASK_COMPLETED, TASK_REOPENED, TASK_UPDATED, TASK_DELETED, ITEM_RENAMED, SESSION_ADDED, SESSION_DELETED |
+| entity_type  | TEXT        | 'learning_item' \| 'study_session'                                         |
+| entity_id    | UUID        |                                                                             |
+| payload      | JSONB       | snapshot of relevant fields at event time                                  |
+| created_at   | TIMESTAMPTZ | NOT NULL DEFAULT now()                                                      |
+
+Indexes: `(user_id)`, `(entity_type, entity_id)`, `(event_type)`.
+
+## 5. API Overview
+
+Base path `/api/v1`. All routes except `auth/register`, `auth/login`, `auth/refresh` require `Authorization: Bearer <access_token>`.
+
+| Method | Path                     | Auth | Purpose                                   |
+|--------|--------------------------|------|--------------------------------------------|
+| POST   | /auth/register            | none | create account, returns access token + sets refresh cookie |
+| POST   | /auth/login                | none | authenticate, returns access token + sets refresh cookie |
+| POST   | /auth/refresh               | cookie | rotate access token using refresh cookie |
+| POST   | /auth/logout                | yes  | revoke refresh token, clear cookie        |
+| GET    | /auth/me                    | yes  | current user                              |
+| PUT    | /profile                    | yes  | update display_name / avatar_url          |
+| PUT    | /profile/password            | yes  | change password                           |
+| GET    | /items                       | yes  | list caller's items (flat)                |
+| POST   | /items                       | yes  | create item                                |
+| PUT    | /items/:id                   | yes  | update title/description/deadline         |
+| PATCH  | /items/:id/status             | yes  | mark complete / reopen                    |
+| DELETE | /items/:id                    | yes  | soft-delete item + descendants + sessions |
+| GET    | /sessions                     | yes  | list caller's sessions (filterable)       |
+| POST   | /sessions                      | yes  | log a session                              |
+| DELETE | /sessions/:id                  | yes  | delete a session                          |
+| GET    | /dashboard                     | yes  | aggregate dashboard payload                |
+| GET    | /stats?range=week\|month\|year | yes  | chart data                                 |
+| GET    | /health                         | none | liveness/readiness check                  |
+
+Full request/response field detail: see the Lead Engineer's plan messages (2026-07-06). Error shape: `{ "error": { "code", "message", "fields"? } }`.
+
+## 6. Deployment Architecture
+
+- **Backend**: Dockerized Go binary, deployable to any container host (Railway/Render/Fly.io recommended as low-friction defaults — see ADR-014). Config entirely via env vars (`DATABASE_URL`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`, `PORT`).
+- **Database**: managed PostgreSQL (Neon/Supabase/Railway Postgres — any works, it's just a connection string).
+- **Frontend**: static Vite build served from Vercel/Netlify/Cloudflare Pages, or from the same domain as the backend behind a reverse proxy (avoids cross-site cookie complexity — see ADR-010).
+- **Local dev parity**: `docker-compose.yml` runs Postgres + backend + frontend together, so dev never touches a different DB engine than production.
+- HTTPS is mandatory in any deployed environment (required for secure cookies to function).
+
+**Pilot topology (AWS free tier — ADR-021):** one small EC2 instance running `docker-compose` (backend container + Postgres container); frontend static build on S3+CloudFront or Vercel/Netlify. Nothing here is a different architecture from the provider-agnostic plan above — it's the same Docker image and the same Postgres connection string, just a concrete choice of "where" for the pilot. Moving to managed RDS or splitting the AI worker into its own container later is a config change, not a rewrite.
+
+## 7. Phase 2 Architecture Readiness — AI Features (not MVP scope)
+
+The user has flagged future phases adding AI: a Learning Generator, Task Breakdown, an "Explain Anything" feature, a Quiz Generator, and other ideas not yet finalized. **None of this is being built now** — the MVP stays AI-free per the original design document. What's below are load-bearing seams decided *now*, while the schema is still cheap to shape, specifically so four unrelated future features don't each invent their own ad-hoc pattern:
+
+| Concern | Decision | Why now |
+|---|---|---|
+| Where LLM calls happen | Single `internal/services/ai/` package behind a provider-agnostic interface — no feature calls an LLM API directly | One place to swap providers, add retries/timeouts, and enforce usage limits (ADR-017) |
+| Slow/long-running generation | Generic `ai_jobs` table (`user_id, job_type, status, input, output, error, timestamps`), claimed via `SELECT ... FOR UPDATE SKIP LOCKED` by a worker pool — not an in-memory queue | Crash-safe and safe across multiple backend replicas without adding Redis/SQS (ADR-018) |
+| Per-user cost/usage | `ai_usage` table (`user_id, feature, tokens_in, tokens_out, estimated_cost, created_at`), queried the same `user_id`-scoped way as everything else | LLM calls cost money per call; need per-user visibility before it's needed for billing/limits (ADR-019) |
+| Future semantic search / embeddings | Reserve Postgres's `pgvector` extension — no separate vector DB | Keeps embeddings next to the relational data they describe; avoids a second system later (ADR-020) |
+
+None of these tables/packages exist yet and are **not** part of Milestones 1-6. They get built when the first AI feature is actually scoped and approved — this section exists so that work starts from an already-agreed foundation instead of a scramble.
+
+## 8. Per-User Data Persistence — request-scoping flow
+
+Every request that touches user data is scoped end to end, never by trusting client input:
+
+1. Client sends `Authorization: Bearer <access_token>`.
+2. `middleware/auth.go` verifies the JWT (signature + expiry). Invalid/missing → 401, request never reaches a handler. Valid → `user_id` (from the token's `sub` claim) is set on the Gin request context.
+3. Handler reads `user_id` from context (never from the URL, query, or body) and passes it as an explicit argument to the service.
+4. Service passes it down to the repository.
+5. **Repository methods require `user_id` as a parameter on every call**, e.g. `GetByID(userID, itemID uuid.UUID)` runs `WHERE id = $1 AND user_id = $2` as one condition — never `WHERE id = $1` alone. A request for another user's ID returns zero rows → handler returns **404, not 403** (never confirm another user's resource exists).
+6. On creates, `user_id` is stamped onto the new row from the authenticated context — it is never a field accepted in any request DTO.
+7. `learning_items.parent_id` is additionally validated in the service layer to belong to the same `user_id` on create/move — a Postgres FK alone can't express "must belong to the same owner," so this is an application-level check.
+8. Indexes (`user_id`, `user_id+status`, `user_id+parent_id`, `user_id+session_date`) keep every one of these scoped queries an index scan regardless of total rows across all hosted users.
+
+## 9. Dashboarding — computed live, per user, on every request
+
+`GET /dashboard` and `GET /stats` are authenticated endpoints; `dashboard_service.go` runs a handful of small `user_id`-scoped aggregate queries per request — no caching or materialized rollup table in the MVP (see ADR-015):
+
+| Stat | Query shape |
+|---|---|
+| study_hours_this_week | `SUM(hours) FROM study_sessions WHERE user_id=$1 AND session_date >= date_trunc('week', now())` |
+| completed / pending items | `SELECT status, COUNT(*) FROM learning_items WHERE user_id=$1 GROUP BY status` |
+| completion_percentage | derived in the service layer from the counts above |
+| current_streak | fetch distinct `session_date`s for the user, walk backward from today **in Go**, count the consecutive run (today not yet logged doesn't break it) — simpler to unit-test as a pure function than as recursive SQL |
+| weekly_hours_chart / top_topics | `GROUP BY` aggregates joined to `learning_items` for titles, `user_id`-scoped |
+| todays_sessions | `study_sessions WHERE user_id=$1 AND session_date = current_date` |
+| recent_activity | derived from recent `learning_items`/`study_sessions` rows by `updated_at` — **not** read from the `events` table, which stays a write-only log reserved for future AI replay |
+
+Rationale for no caching: each user's dataset is tiny (dozens–hundreds of rows even after months of use), so these are sub-millisecond indexed reads. Add caching only if real pilot usage shows otherwise.
+
+**Client-side cache isolation:** the frontend's TanStack Query cache is process memory, not per-user. On logout (or a failed silent-refresh), the frontend calls `queryClient.clear()` before redirecting to `/login` — otherwise a second person logging into the same shared browser could briefly see the previous user's cached dashboard/tree data.
+
+## 10. Major Design Changes
+
+- **2026-07-06**: Scope changed from local single-user SQLite tool to hosted multi-user app with auth/profiles. Database engine changed SQLite → PostgreSQL. Added `users`, `refresh_tokens` tables and `user_id` scoping across all data tables. Added Deployment Agent and deployment milestone. Elevated responsive design to a Milestone-2 requirement. See ADR-007 through ADR-014 in `docs/DECISIONS.md`.
+- **2026-07-06**: Clarified per-user request-scoping flow and dashboard computation strategy (sections 8-9 above) in response to a direct question. Changed cross-user access response from 403 to 404 (ADR-016). Documented no-caching rationale for dashboard stats (ADR-015) and added a mandatory `queryClient.clear()` on logout (client cache isolation between users on a shared device).
+- **2026-07-06**: Phase 2 AI-readiness architecture (§7) and AWS pilot hosting topology (§6) added in response to a scalability question, ADR-017 through ADR-021 — no code, architecture placeholders only.
+- **2026-07-06**: Milestone 1 (Backend Foundation + Auth) implemented, tested, and reviewed. Two review-driven fixes applied before sign-off: (1) `EventService.Record` now logs failures instead of silently discarding them — a swallowed audit-log write would quietly undermine the event table's whole purpose; (2) `handlers.RespondError` matches service errors via `errors.As` instead of a direct type assertion, for robustness against wrapped errors. Actual folder structure ended up with two packages not in the original plan: `internal/apperror` (typed service errors) and `internal/testutil` (real-Postgres test helper) — both are small, load-bearing, and consistent with the layering rules already established, not scope creep.

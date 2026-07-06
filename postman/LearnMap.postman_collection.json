@@ -1,0 +1,1113 @@
+{
+  "info": {
+    "name": "LearnMap.app API",
+    "_postman_id": "b6f6a5b0-1c2a-4b7e-9f3d-1e2a3b4c5d6e",
+    "description": "Manual test collection for the LearnMap.app backend (Milestone 1: auth, learning items, study sessions, dashboard/stats).\n\nHow to use:\n1. Make sure the backend is running (locally: `go run ./cmd/server` or the golang:latest container, per docs/ARCHITECTURE.md) and Postgres is up (`docker compose up -d postgres`).\n2. Set the `invite_code` collection variable to match whatever `INVITE_CODE` your running backend was started with.\n3. Run folders top-to-bottom, or use Collection Runner to run the whole collection in one pass — it's designed to be safely re-runnable (Register requests generate a unique email each run).\n4. Requests are grouped so state flows automatically: Register/Login capture `access_token_*` and `user_id_*` into collection variables; Create Item/Session capture their ids. You should not need to copy/paste anything manually.\n\nNotes on refresh-token cookies: Postman's cookie jar is shared per host, not per logical user, so once Bob is registered (near the end, for the cross-user isolation checks) his Set-Cookie response overwrites whatever refresh cookie was stored for Alice. That's why Alice's own Refresh/Logout checks run early, right after she registers, before Bob exists — everything after that only depends on the Bearer access token header, not the cookie, so it isn't affected.\n\nThe single most important thing this collection verifies is in the \"Cross-User Isolation\" folder: Bob, authenticated as himself, attempting to read/rename/complete/delete Alice's learning item and delete her study session — every one of those must come back 404, never the data, and never a distinguishing 403.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token_alice}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
+    { "key": "invite_code", "value": "pilot2026", "type": "string" },
+    { "key": "password", "value": "Password123!", "type": "string" },
+    { "key": "alice_email", "value": "", "type": "string" },
+    { "key": "bob_email", "value": "", "type": "string" },
+    { "key": "access_token_alice", "value": "", "type": "string" },
+    { "key": "access_token_bob", "value": "", "type": "string" },
+    { "key": "user_id_alice", "value": "", "type": "string" },
+    { "key": "user_id_bob", "value": "", "type": "string" },
+    { "key": "root_item_id", "value": "", "type": "string" },
+    { "key": "child_item_id", "value": "", "type": "string" },
+    { "key": "session_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('body reports ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth — Alice (register, refresh, logout)",
+      "item": [
+        {
+          "name": "Register Alice",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('alice_email', `alice.${Date.now()}.${Math.floor(Math.random()*10000)}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('returns access token', () => pm.expect(json.access_token).to.be.a('string').and.not.empty);",
+                  "pm.collectionVariables.set('access_token_alice', json.access_token);",
+                  "pm.collectionVariables.set('user_id_alice', json.user.id);",
+                  "pm.test('sets a refresh_token cookie', () => {",
+                  "  const cookie = pm.cookies.toObject()['refresh_token'];",
+                  "  pm.expect(cookie).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{alice_email}}\",\n  \"password\": \"{{password}}\",\n  \"display_name\": \"Alice\",\n  \"invite_code\": \"{{invite_code}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Me (Alice)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('email matches Alice', () => pm.expect(pm.response.json().email).to.eql(pm.collectionVariables.get('alice_email')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/auth/me", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "me"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Alice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('returns a fresh access token', () => pm.expect(json.access_token).to.be.a('string').and.not.empty);",
+                  "pm.collectionVariables.set('access_token_alice', json.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/auth/refresh", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "refresh"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout Alice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/auth/logout", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "logout"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh After Logout (expect 401 — revoked)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 401 — refresh token was revoked by logout', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/auth/refresh", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "refresh"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Alice (re-authenticate for the rest of the collection)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('access_token_alice', json.access_token);",
+                  "pm.collectionVariables.set('user_id_alice', json.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{alice_email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "login"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth — Validation Checks",
+      "item": [
+        {
+          "name": "Register — Wrong Invite Code (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nope.{{$timestamp}}@example.com\",\n  \"password\": \"{{password}}\",\n  \"display_name\": \"Nobody\",\n  \"invite_code\": \"definitely-wrong-code\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Register — Duplicate Email (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 409', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{alice_email}}\",\n  \"password\": \"{{password}}\",\n  \"display_name\": \"Alice Again\",\n  \"invite_code\": \"{{invite_code}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Login — Wrong Password (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{alice_email}}\",\n  \"password\": \"definitely-wrong-password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "login"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Protected Route Without Token (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profile (Alice)",
+      "item": [
+        {
+          "name": "Update Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('display_name updated', () => pm.expect(pm.response.json().display_name).to.eql('Alice Updated'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"display_name\": \"Alice Updated\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/profile", "host": ["{{base_url}}"], "path": ["api", "v1", "profile"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 204', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{password}}\",\n  \"new_password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/profile/password", "host": ["{{base_url}}"], "path": ["api", "v1", "profile", "password"] }
+          },
+          "description": "Changes the password to the same value as before (current_password == new_password) so the rest of the collection doesn't need to track a changed password. This still fully exercises the endpoint (current-password verification + rehash).",
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Learning Items (Alice)",
+      "item": [
+        {
+          "name": "List Items (expect empty)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('empty list for a brand new user', () => pm.expect(pm.response.json()).to.be.an('array').that.is.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Root Item (Backend)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('status defaults to not_started', () => pm.expect(json.status).to.eql('not_started'));",
+                  "pm.collectionVariables.set('root_item_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Backend\",\n  \"description\": \"Backend learning path\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Child Item (Kafka, under Backend)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('parent_id matches Backend', () => pm.expect(json.parent_id).to.eql(pm.collectionVariables.get('root_item_id')));",
+                  "pm.collectionVariables.set('child_item_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Kafka\",\n  \"parent_id\": \"{{root_item_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Child With Nonexistent Parent (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Orphan\",\n  \"parent_id\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Rename Child Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('title updated', () => pm.expect(pm.response.json().title).to.eql('Apache Kafka'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Apache Kafka\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/items/{{child_item_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "items", "{{child_item_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Child Item Completed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('status is completed', () => pm.expect(json.status).to.eql('completed'));",
+                  "pm.test('completed_at is set', () => pm.expect(json.completed_at).to.not.be.null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/items/{{child_item_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "items", "{{child_item_id}}", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reopen Child Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('status is in_progress', () => pm.expect(json.status).to.eql('in_progress'));",
+                  "pm.test('completed_at cleared', () => pm.expect(json.completed_at).to.be.null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/items/{{child_item_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "items", "{{child_item_id}}", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Status — Invalid Value (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"archived\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/items/{{child_item_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "items", "{{child_item_id}}", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Items (expect Backend + Kafka)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has 2 items', () => pm.expect(pm.response.json()).to.have.lengthOf(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Study Sessions (Alice)",
+      "item": [
+        {
+          "name": "Create Session (invalid hours, expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"learning_item_id\": \"{{child_item_id}}\",\n  \"hours\": 25,\n  \"session_date\": \"2026-07-06\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/sessions", "host": ["{{base_url}}"], "path": ["api", "v1", "sessions"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Session (Kafka, 2.5 hours today)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('hours is 2.5', () => pm.expect(json.hours).to.eql(2.5));",
+                  "pm.collectionVariables.set('session_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"learning_item_id\": \"{{child_item_id}}\",\n  \"hours\": 2.5,\n  \"notes\": \"Worked through Consumer Groups\",\n  \"session_date\": \"2026-07-06\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/sessions", "host": ["{{base_url}}"], "path": ["api", "v1", "sessions"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has 1 session', () => pm.expect(pm.response.json()).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/sessions", "host": ["{{base_url}}"], "path": ["api", "v1", "sessions"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Sessions Filtered By Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns the Kafka session', () => pm.expect(pm.response.json()).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sessions?item_id={{child_item_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sessions"],
+              "query": [{ "key": "item_id", "value": "{{child_item_id}}" }]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard & Stats (Alice)",
+      "item": [
+        {
+          "name": "Get Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('study_hours_this_week reflects the logged session', () => pm.expect(json.study_hours_this_week).to.eql(2.5));",
+                  "pm.test('current_streak is at least 1', () => pm.expect(json.current_streak).to.be.at.least(1));",
+                  "pm.test('todays_sessions uses the clean API shape (not raw GORM fields)', () => {",
+                  "  pm.expect(json.todays_sessions[0]).to.have.property('learning_item_id');",
+                  "  pm.expect(json.todays_sessions[0]).to.not.have.property('DeletedAt');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/dashboard", "host": ["{{base_url}}"], "path": ["api", "v1", "dashboard"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Stats — Week",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stats?range=week",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "stats"],
+              "query": [{ "key": "range", "value": "week" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Stats — Month",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stats?range=month",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "stats"],
+              "query": [{ "key": "range", "value": "month" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Stats — Year",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stats?range=year",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "stats"],
+              "query": [{ "key": "range", "value": "year" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Stats — Invalid Range (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stats?range=decade",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "stats"],
+              "query": [{ "key": "range", "value": "decade" }]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cross-User Isolation (Bob vs. Alice) — the critical security checks",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{access_token_bob}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Register Bob",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('bob_email', `bob.${Date.now()}.${Math.floor(Math.random()*10000)}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('access_token_bob', json.access_token);",
+                  "pm.collectionVariables.set('user_id_bob', json.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{bob_email}}\",\n  \"password\": \"{{password}}\",\n  \"display_name\": \"Bob\",\n  \"invite_code\": \"{{invite_code}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Bob's Item List Is Empty (owns nothing)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('empty — Bob does not see Alice\\'s items', () => pm.expect(pm.response.json()).to.be.an('array').that.is.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Bob's Session List Is Empty (owns nothing)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('empty — Bob does not see Alice\\'s sessions', () => pm.expect(pm.response.json()).to.be.an('array').that.is.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/sessions", "host": ["{{base_url}}"], "path": ["api", "v1", "sessions"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Bob Tries To Rename Alice's Item (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404, not 403 or 200 (ADR-016)', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"pwned by bob\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/items/{{child_item_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "items", "{{child_item_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Bob Tries To Change Alice's Item Status (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/items/{{child_item_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "items", "{{child_item_id}}", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bob Tries To Delete Alice's Session (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/sessions/{{session_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "sessions", "{{session_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Bob Tries To Delete Alice's Item (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items/{{child_item_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "items", "{{child_item_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Alice's Item Is Completely Unchanged",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const kafka = json.find(i => i.id === pm.collectionVariables.get('child_item_id'));",
+                  "pm.test('Kafka item still exists', () => pm.expect(kafka).to.not.be.undefined);",
+                  "pm.test('title was not changed by Bob', () => pm.expect(kafka.title).to.eql('Apache Kafka'));",
+                  "pm.test('status was not changed by Bob', () => pm.expect(kafka.status).to.eql('in_progress'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token_alice}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cleanup (Alice) — cascade delete",
+      "item": [
+        {
+          "name": "Delete Root Item (cascades to Kafka + its session)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('deleted_count is 2 (Backend + Kafka)', () => pm.expect(pm.response.json().deleted_count).to.eql(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items/{{root_item_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "items", "{{root_item_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Items (expect empty again)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('empty after cascade delete', () => pm.expect(pm.response.json()).to.be.an('array').that.is.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/items", "host": ["{{base_url}}"], "path": ["api", "v1", "items"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Sessions (expect empty — cascaded too)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('empty — session was soft-deleted with its parent item', () => pm.expect(pm.response.json()).to.be.an('array').that.is.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/sessions", "host": ["{{base_url}}"], "path": ["api", "v1", "sessions"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

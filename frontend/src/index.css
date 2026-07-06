@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@import "@fontsource-variable/inter";
+@import "@fontsource/poppins/400.css";
+@import "@fontsource/poppins/500.css";
+@import "@fontsource/poppins/600.css";
+@import "@fontsource/poppins/700.css";
+@import "@fontsource-variable/jetbrains-mono";
+
+/*
+ * LearnMap.app design tokens (light theme only — no dark mode in MVP, per
+ * the design document §4 and the design-system-agent charter). Values here
+ * are the literal hex codes from the design doc, kept intact rather than
+ * converted to oklch, so they stay directly traceable to the spec.
+ */
+@theme inline {
+    --font-sans: 'Inter Variable', system-ui, sans-serif;
+    --font-heading: 'Poppins', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-accent-hover: var(--accent-hover);
+
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.5);
+    --radius-md: calc(var(--radius) * 0.75);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.5);
+}
+
+:root {
+    /* Accent — Warm Yellow */
+    --primary: #FACC15;
+    --primary-foreground: #222222;
+    --accent-hover: #EAB308;
+    /* shadcn's single "accent" slot = the design doc's soft yellow background,
+       used for subtle hover/highlight surfaces (menu item hover, selected state) */
+    --accent: #FEF9C3;
+    --accent-foreground: #222222;
+
+    /* Neutrals */
+    --background: #FFFDF7;
+    --foreground: #222222;
+    --card: #FFFFFF;
+    --card-foreground: #222222;
+    --popover: #FFFFFF;
+    --popover-foreground: #222222;
+    --secondary: #FAFAF5;
+    --secondary-foreground: #222222;
+    --muted: #FAFAF5;
+    --muted-foreground: #666666;
+    --border: #EAE7DC;
+    --input: #EAE7DC;
+    --ring: #EAB308;
+
+    /* Semantic */
+    --success: #22C55E;
+    --warning: #F97316;
+    --destructive: #EF4444;
+
+    /* Rounded corners — 16px base */
+    --radius: 1rem;
+
+    /* Sidebar tokens (nav) mirror the base neutrals — single light theme, no separate sidebar palette needed */
+    --sidebar: #FFFDF7;
+    --sidebar-foreground: #222222;
+    --sidebar-primary: #FACC15;
+    --sidebar-primary-foreground: #222222;
+    --sidebar-accent: #FEF9C3;
+    --sidebar-accent-foreground: #222222;
+    --sidebar-border: #EAE7DC;
+    --sidebar-ring: #EAB308;
+
+    /* Unused in the MVP (no charts yet, Milestone 4) — placeholders so shadcn
+       chart-aware components don't break if added early; revisit in M4. */
+    --chart-1: #FACC15;
+    --chart-2: #22C55E;
+    --chart-3: #F97316;
+    --chart-4: #EF4444;
+    --chart-5: #666666;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+/*
+ * Motion convention (design doc §14): all transitions 150-200ms, never
+ * flashy. Use Tailwind's built-in `duration-150`/`duration-200` utilities
+ * directly — no custom transition utility needed.
+ *
+ * Touch targets (design-system-agent charter): interactive elements should
+ * be at least 44x44px on phone. Tailwind's `size-11` (44px) utility already
+ * covers this — use it for icon buttons / tap targets, no custom class needed.
+ */
