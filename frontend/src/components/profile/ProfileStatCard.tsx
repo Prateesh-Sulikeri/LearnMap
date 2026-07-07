@@ -3,6 +3,7 @@ import { toPng } from 'html-to-image'
 import { toast } from 'sonner'
 import { Download, Flame, Trophy } from 'lucide-react'
 import type { Dashboard, User } from '@/types/api'
+import { resolveAssetUrl } from '@/utils/url'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 
@@ -43,7 +44,7 @@ export function ProfileStatCard({ user, dashboard }: ProfileStatCardProps) {
         >
           {user.avatar_url ? (
             <img
-              src={user.avatar_url}
+              src={resolveAssetUrl(user.avatar_url)}
               alt=""
               className="size-20 rounded-full object-cover ring-4 ring-background"
               crossOrigin="anonymous"

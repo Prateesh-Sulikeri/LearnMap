@@ -1,19 +1,48 @@
+import { isValidElement, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
-import { API_ORIGIN } from '@/services/client'
+import { Check, Copy } from 'lucide-react'
+import { resolveAssetUrl } from '@/utils/url'
 import './markdown-preview.css'
 
-// Uploaded images are returned as root-relative paths (see uploadsApi/backend
-// upload handler) so a change of domain never breaks already-saved notes —
-// resolve them against the backend's origin here, at render time. Externally
-// pasted http(s) URLs pass through unchanged.
-function resolveImageSrc(src: string | undefined): string | undefined {
-  if (!src) return src
-  return src.startsWith('/') ? `${API_ORIGIN}${src}` : src
+function extractText(node: React.ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(extractText).join('')
+  if (isValidElement<{ children?: React.ReactNode }>(node)) return extractText(node.props.children)
+  return ''
+}
+
+function CodeBlock({ children }: { children?: React.ReactNode }) {
+  const [copied, setCopied] = useState(false)
+
+  const codeElement = Array.isArray(children) ? children[0] : children
+  const className = isValidElement<{ className?: string }>(codeElement) ? codeElement.props.className : undefined
+  const language = className?.match(/language-(\w+)/)?.[1]
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(extractText(children))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard access can fail (permissions, non-secure context) — not worth surfacing an error toast for.
+    }
+  }
+
+  return (
+    <pre>
+      {language && <span className="md-preview-lang">{language}</span>}
+      <button type="button" className="md-preview-copy" onClick={() => void handleCopy()} aria-label="Copy code">
+        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      </button>
+      {children}
+    </pre>
+  )
 }
 
 const components: Components = {
-  img: ({ src, alt }) => <img src={resolveImageSrc(typeof src === 'string' ? src : undefined)} alt={alt ?? ''} />,
+  img: ({ src, alt }) => <img src={resolveAssetUrl(typeof src === 'string' ? src : undefined)} alt={alt ?? ''} />,
+  pre: CodeBlock,
 }
 
 export function MarkdownPreview({ source }: { source: string }) {

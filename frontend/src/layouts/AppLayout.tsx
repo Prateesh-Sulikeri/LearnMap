@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAuth } from '@/hooks/useAuth'
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
+import { resolveAssetUrl } from '@/utils/url'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -48,11 +49,14 @@ export default function AppLayout() {
   const currentTitle = PAGE_TITLES[location.pathname] ?? 'LearnMap'
 
   return (
-    <div className="min-h-screen bg-background md:flex">
-      {/* Sidebar nav — tablet/desktop (md and up), collapsible to icon-only */}
+    <div className="h-screen overflow-hidden bg-background md:flex">
+      {/* Sidebar nav — tablet/desktop (md and up), collapsible to icon-only.
+          Scrolls independently of the main content (its own overflow-y-auto)
+          so it never gets carried away by a tall page — the outer shell is
+          locked to the viewport height instead of the whole document scrolling. */}
       <aside
         className={cn(
-          'hidden md:flex md:shrink-0 md:flex-col md:border-r md:border-border md:bg-card md:p-3 md:transition-[width] md:duration-150',
+          'hidden md:flex md:shrink-0 md:flex-col md:overflow-y-auto md:border-r md:border-border md:bg-card md:p-3 md:transition-[width] md:duration-150',
           sidebarCollapsed ? 'md:w-16' : 'md:w-60',
         )}
       >
@@ -114,7 +118,7 @@ export default function AppLayout() {
           {!sidebarCollapsed && user && (
             <Link to="/profile" className="flex items-center gap-2 truncate text-xs text-muted-foreground hover:text-foreground">
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt="" className="size-6 shrink-0 rounded-full object-cover" />
+                <img src={resolveAssetUrl(user.avatar_url)} alt="" className="size-6 shrink-0 rounded-full object-cover" />
               ) : (
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[0.6rem] font-semibold text-primary-foreground">
                   {user.display_name.charAt(0).toUpperCase()}
@@ -142,7 +146,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-20 md:pb-0">
         {/* Top bar: breadcrumb — present on every page */}
         <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
           <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">

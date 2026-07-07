@@ -1,13 +1,17 @@
+import { useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { Loader2, Upload } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { profileApi } from '@/services/profileApi'
 import { dashboardApi } from '@/services/dashboardApi'
+import { uploadsApi } from '@/services/uploadsApi'
 import { getApiErrorMessage } from '@/utils/apiError'
 import { formatOrdinalDate } from '@/utils/date'
+import { resolveAssetUrl } from '@/utils/url'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,7 +20,9 @@ import { ProfileStatCard } from '@/components/profile/ProfileStatCard'
 
 const profileFormSchema = z.object({
   displayName: z.string().min(1, 'Tell us what to call you'),
-  avatarUrl: z.string().url('Must be a valid URL').or(z.literal('')),
+  avatarUrl: z
+    .string()
+    .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//.test(v), { message: 'Must be a valid URL' }),
 })
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
@@ -35,11 +41,13 @@ type PasswordFormValues = z.infer<typeof passwordFormSchema>
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
   const { data: dashboard } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
+  const avatarFileInputRef = useRef<HTMLInputElement>(null)
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: { displayName: user?.display_name ?? '', avatarUrl: user?.avatar_url ?? '' },
   })
+  const avatarUrlValue = profileForm.watch('avatarUrl')
 
   const updateProfile = useMutation({
     mutationFn: (values: ProfileFormValues) =>
@@ -47,6 +55,15 @@ export default function ProfilePage() {
     onSuccess: (updated) => {
       updateUser(updated)
       toast.success('Profile updated')
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
+  })
+
+  const uploadAvatar = useMutation({
+    mutationFn: (file: File) => uploadsApi.uploadImage(file),
+    onSuccess: (data) => {
+      profileForm.setValue('avatarUrl', data.url, { shouldValidate: true, shouldDirty: true })
+      toast.success('Photo uploaded — click Save changes to apply it')
     },
     onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
@@ -90,11 +107,46 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="profile-avatar-url">Avatar URL</Label>
-              <Input id="profile-avatar-url" placeholder="https://…" {...profileForm.register('avatarUrl')} />
+              <Label htmlFor="profile-avatar-url">Avatar</Label>
+              <div className="flex items-center gap-3">
+                {avatarUrlValue ? (
+                  <img
+                    src={resolveAssetUrl(avatarUrlValue)}
+                    alt=""
+                    className="size-11 shrink-0 rounded-full object-cover ring-1 ring-foreground/10"
+                  />
+                ) : (
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground ring-1 ring-foreground/10">
+                    None
+                  </div>
+                )}
+                <Input id="profile-avatar-url" placeholder="https://…" {...profileForm.register('avatarUrl')} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={uploadAvatar.isPending}
+                  onClick={() => avatarFileInputRef.current?.click()}
+                >
+                  {uploadAvatar.isPending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                  Upload
+                </Button>
+                <input
+                  ref={avatarFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadAvatar.mutate(file)
+                    e.target.value = ''
+                  }}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
-                A link to an image already hosted somewhere (e.g. Gravatar) — shown on your stat card above and in
-                the sidebar.
+                Paste a link to an image already hosted somewhere (e.g. Gravatar), or upload a photo directly if you
+                don&apos;t have one anywhere — either way it's shown on your stat card above and in the sidebar.
               </p>
               {profileForm.formState.errors.avatarUrl && (
                 <p className="text-sm text-destructive">{profileForm.formState.errors.avatarUrl.message}</p>

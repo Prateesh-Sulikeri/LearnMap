@@ -24,16 +24,19 @@ export function insertLinePrefix(value: string, start: number, end: number, pref
   return { text, selectionStart: start + prefix.length, selectionEnd: end + prefix.length }
 }
 
-/** Wraps the selection in a fenced code block, or inserts an empty one with the cursor on the blank line between fences. */
+/**
+ * Wraps the selection in a fenced code block (or inserts an empty one),
+ * with the word "language" pre-selected right after the opening fence so
+ * the user can type over it with an actual language (e.g. "js", "python")
+ * — the fence's language tag, not syntax highlighting (this editor doesn't
+ * highlight), but it's still useful for clarity and for any tool reading
+ * the markdown later.
+ */
 export function insertCodeBlock(value: string, start: number, end: number): EditResult {
   const selected = value.slice(start, end)
-  if (selected) {
-    const text = value.slice(0, start) + '```\n' + selected + '\n```' + value.slice(end)
-    return { text, selectionStart: start + 4, selectionEnd: start + 4 + selected.length }
-  }
-  const text = value.slice(0, start) + '```\n\n```' + value.slice(end)
-  const cursor = start + 4
-  return { text, selectionStart: cursor, selectionEnd: cursor }
+  const body = selected ? `${selected}\n` : '\n'
+  const text = value.slice(0, start) + '```language\n' + body + '```' + value.slice(end)
+  return { text, selectionStart: start + 3, selectionEnd: start + 3 + 'language'.length }
 }
 
 /** Generic insertion at the cursor, replacing any current selection — used for images. */

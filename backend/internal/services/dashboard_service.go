@@ -208,7 +208,7 @@ func fillDailySeries(rows []repositories.DailyHours, from, to time.Time) []Daily
 		byDate[r.Date.Format("2006-01-02")] = r.Hours
 	}
 
-	var points []DailyHoursPoint
+	points := make([]DailyHoursPoint, 0, 7)
 	for d := startOfDay(from); !d.After(startOfDay(to)); d = d.AddDate(0, 0, 1) {
 		key := d.Format("2006-01-02")
 		points = append(points, DailyHoursPoint{Date: key, Hours: byDate[key]})
@@ -221,7 +221,7 @@ func dailyPointsFrom(rows []repositories.DailyHours, from, to time.Time) []Stats
 	for _, r := range rows {
 		byDate[r.Date.Format("2006-01-02")] = r.Hours
 	}
-	var points []StatsPoint
+	points := make([]StatsPoint, 0, 31)
 	for d := startOfDay(from); !d.After(startOfDay(to)); d = d.AddDate(0, 0, 1) {
 		key := d.Format("2006-01-02")
 		points = append(points, StatsPoint{Period: key, Hours: byDate[key]})
@@ -249,7 +249,10 @@ func buildRecentActivity(items []models.LearningItem, todaysSessions []models.St
 		titleByItemID[item.ID] = item.Title
 	}
 
-	var activity []ActivityPoint
+	// Must stay a non-nil slice even when both inputs are empty (e.g. a
+	// brand-new user) — a nil slice marshals to JSON `null`, and the
+	// frontend calls `.length` on this unconditionally.
+	activity := make([]ActivityPoint, 0, len(items)+len(todaysSessions))
 	for _, item := range items {
 		activity = append(activity, ActivityPoint{Type: "item_updated", Title: item.Title, Timestamp: item.UpdatedAt})
 	}

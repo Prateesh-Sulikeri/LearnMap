@@ -1,6 +1,6 @@
 import { useRef, type RefObject } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Bold, Code, Heading1, Heading2, Image, Italic, Loader2, SquareCode } from 'lucide-react'
+import { Bold, Code, Heading1, Heading2, Image, Italic, List, Loader2, SquareCode } from 'lucide-react'
 import { toast } from 'sonner'
 import { uploadsApi } from '@/services/uploadsApi'
 import { getApiErrorMessage } from '@/utils/apiError'
@@ -64,6 +64,10 @@ export function MarkdownToolbar({ textareaRef, value, onChange }: MarkdownToolba
       </ToolbarButton>
       <ToolbarButton label="Subheader" onClick={withSelection((v, s, e) => insertLinePrefix(v, s, e, '## '))}>
         <Heading2 className="size-4" />
+      </ToolbarButton>
+      <Separator orientation="vertical" className="mx-1 h-5" />
+      <ToolbarButton label="Bulleted list" onClick={withSelection((v, s, e) => insertLinePrefix(v, s, e, '- '))}>
+        <List className="size-4" />
       </ToolbarButton>
       <Separator orientation="vertical" className="mx-1 h-5" />
       <ToolbarButton label="Inline code" onClick={withSelection((v, s, e) => wrapSelection(v, s, e, '`', 'code'))}>

@@ -58,7 +58,7 @@ export function NotesEditorDialog({ node, onOpenChange, onNavigate }: NotesEdito
 
   return (
     <Dialog open={node !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85dvh] flex-col overflow-hidden sm:max-w-xl lg:max-w-2xl">
+      <DialogContent className="flex h-[85dvh] flex-col overflow-hidden sm:max-w-xl lg:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{node?.title ?? 'Notes'}</DialogTitle>
           <DialogDescription>Markdown supported — headers, bold/italic, code blocks, and images.</DialogDescription>
