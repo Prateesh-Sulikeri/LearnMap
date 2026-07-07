@@ -11,7 +11,7 @@ export interface StreakRank {
 // A fire-themed progression matching the streak stat's existing Flame
 // icon — each tier gets its own icon + color so the badges read as
 // genuinely distinct achievements, not just one icon recolored.
-const RANKS: StreakRank[] = [
+export const RANKS: StreakRank[] = [
   { name: 'Unranked', icon: Circle, minDays: 0, color: 'text-muted-foreground', bg: 'bg-muted' },
   { name: 'Spark', icon: Sparkle, minDays: 1, color: 'text-amber-500', bg: 'bg-amber-500/15' },
   { name: 'Ember', icon: Flame, minDays: 3, color: 'text-orange-500', bg: 'bg-orange-500/15' },

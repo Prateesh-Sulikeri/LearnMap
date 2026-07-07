@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   CalendarClock,
   LayoutDashboard,
@@ -15,7 +16,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAuth } from '@/hooks/useAuth'
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
+import { dashboardApi } from '@/services/dashboardApi'
 import { resolveAssetUrl } from '@/utils/url'
+import { getStreakRank } from '@/utils/streakRank'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -45,8 +48,11 @@ export default function AppLayout() {
   const { logout, user } = useAuth()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
+  const { data: dashboard } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
 
   const currentTitle = PAGE_TITLES[location.pathname] ?? 'LearnMap'
+  const rank = getStreakRank(dashboard?.current_streak ?? 0)
+  const RankIcon = rank.icon
 
   return (
     <div className="h-screen overflow-hidden bg-background md:flex">
@@ -116,7 +122,7 @@ export default function AppLayout() {
 
         <div className="mt-auto space-y-2 px-1">
           {!sidebarCollapsed && user && (
-            <Link to="/profile" className="flex items-center gap-2 truncate text-xs text-muted-foreground hover:text-foreground">
+            <Link to="/profile" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
               {user.avatar_url ? (
                 <img src={resolveAssetUrl(user.avatar_url)} alt="" className="size-6 shrink-0 rounded-full object-cover" />
               ) : (
@@ -124,7 +130,13 @@ export default function AppLayout() {
                   {user.display_name.charAt(0).toUpperCase()}
                 </span>
               )}
-              <span className="truncate">{user.display_name}</span>
+              <span className="min-w-0">
+                <span className="block truncate">{user.display_name}</span>
+                <span className={cn('flex items-center gap-1 text-[0.65rem] font-medium', rank.color)}>
+                  <RankIcon className="size-3 shrink-0" />
+                  {rank.name}
+                </span>
+              </span>
             </Link>
           )}
           <Tooltip>

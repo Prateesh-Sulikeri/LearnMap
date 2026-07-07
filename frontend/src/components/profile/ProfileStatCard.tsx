@@ -1,12 +1,13 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import { toast } from 'sonner'
-import { Download, Flame, Trophy } from 'lucide-react'
+import { Download, Flame, Medal, Trophy } from 'lucide-react'
 import type { Dashboard, User } from '@/types/api'
 import { resolveAssetUrl } from '@/utils/url'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { StreakRankBadge } from '@/components/profile/StreakRankBadge'
+import { AllRanksDialog } from '@/components/profile/AllRanksDialog'
 
 interface ProfileStatCardProps {
   user: User
@@ -21,7 +22,9 @@ interface ProfileStatCardProps {
 // server-side image proxy to work around for this MVP).
 export function ProfileStatCard({ user, dashboard }: ProfileStatCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
+  const [allRanksOpen, setAllRanksOpen] = useState(false)
   const topTopic = dashboard?.top_topics[0]
+  const currentStreak = dashboard?.current_streak ?? 0
 
   const handleExport = async () => {
     if (!cardRef.current) return
@@ -60,12 +63,12 @@ export function ProfileStatCard({ user, dashboard }: ProfileStatCardProps) {
             <p className="text-xs text-muted-foreground">learnmap.app</p>
           </div>
 
-          <StreakRankBadge streakDays={dashboard?.current_streak ?? 0} size="lg" showProgress />
+          <StreakRankBadge streakDays={currentStreak} size="lg" showProgress />
 
           <div className="grid w-full grid-cols-2 gap-3">
             <div className="rounded-xl bg-card px-3 py-4 ring-1 ring-foreground/10">
               <Flame className="mx-auto size-5 text-warning" />
-              <p className="mt-1 font-mono text-2xl font-semibold">{dashboard?.current_streak ?? 0}</p>
+              <p className="mt-1 font-mono text-2xl font-semibold">{currentStreak}</p>
               <p className="text-xs text-muted-foreground">day streak</p>
             </div>
             <div className="rounded-xl bg-card px-3 py-4 ring-1 ring-foreground/10">
@@ -76,12 +79,18 @@ export function ProfileStatCard({ user, dashboard }: ProfileStatCardProps) {
           </div>
         </div>
       </CardContent>
-      <CardFooter>
-        <Button variant="outline" className="w-full" onClick={() => void handleExport()}>
+      <CardFooter className="gap-2">
+        <Button variant="outline" className="flex-1" onClick={() => void handleExport()}>
           <Download className="size-4" />
           Export as image
         </Button>
+        <Button variant="ghost" onClick={() => setAllRanksOpen(true)}>
+          <Medal className="size-4" />
+          View all ranks
+        </Button>
       </CardFooter>
+
+      <AllRanksDialog open={allRanksOpen} onOpenChange={setAllRanksOpen} currentStreak={currentStreak} />
     </Card>
   )
 }

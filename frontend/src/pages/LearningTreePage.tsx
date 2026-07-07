@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Circle, CircleCheck, List, ListTree, Search, Trash2, Workflow } from 'lucide-react'
+import { CircleCheck, List, ListTree, NotepadText, Search, Trash2, Workflow } from 'lucide-react'
 import { useLearningTree } from '@/hooks/useLearningTree'
 import { useCollapsedState } from '@/hooks/useCollapsedState'
 import { useTreeViewMode } from '@/hooks/useTreeViewMode'
-import { findNodeById, nodeMatchesSearch } from '@/utils/tree'
+import { findNodeById, findRootContaining, nodeMatchesSearch } from '@/utils/tree'
 import { TreeNode } from '@/components/TreeNode'
 import { OrgChartTree } from '@/components/tree/OrgChartTree'
 import { NotesEditorDialog } from '@/components/notes/NotesEditorDialog'
@@ -28,6 +28,10 @@ export default function LearningTreePage() {
   // table-of-contents entry inside the dialog hand off to a different
   // item's notes without any dialog-in-dialog nesting.
   const notesNode = notesItemId ? findNodeById(tree, notesItemId) : null
+  // Focus mode's side tree is rooted at the whole topic (the top-level
+  // ancestor), not just the current item's own children — so every
+  // related note stays reachable while writing, not just its direct kids.
+  const notesRootAncestor = notesItemId ? findRootContaining(tree, notesItemId) : null
 
   if (isLoading) {
     return (
@@ -72,7 +76,7 @@ export default function LearningTreePage() {
           className={cn('gap-1.5', tab === 'active' && 'bg-accent text-accent-foreground')}
           onClick={() => setTab('active')}
         >
-          <Circle className="size-4" />
+          <NotepadText className="size-4" />
           Active
         </Button>
         <Button
@@ -166,6 +170,7 @@ export default function LearningTreePage() {
 
       <NotesEditorDialog
         node={notesNode}
+        rootAncestor={notesRootAncestor}
         onOpenChange={(open) => !open && setNotesItemId(null)}
         onNavigate={setNotesItemId}
       />

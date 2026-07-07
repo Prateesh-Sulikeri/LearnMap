@@ -48,6 +48,16 @@ export function findNodeById(roots: LearningTreeNode[], id: string): LearningTre
   return null
 }
 
+function containsId(node: LearningTreeNode, id: string): boolean {
+  if (node.id === id) return true
+  return node.children.some((child) => containsId(child, id))
+}
+
+/** Finds which top-level root's subtree contains the given id — used by the notes editor's focus mode to show the whole topic's tree, not just the current item's own children. */
+export function findRootContaining(roots: LearningTreeNode[], id: string): LearningTreeNode | null {
+  return roots.find((root) => containsId(root, id)) ?? null
+}
+
 export interface CompletionCount {
   completed: number
   total: number
