@@ -49,7 +49,7 @@ Three items from the same Todo were explicitly scoped down or deferred after ask
 - `NumberBadge` now grows into a pill for longer labels instead of a fixed-size circle that clipped them.
 - Notes-editor header actions consolidated into a single "..." dropdown (was 4 unlabeled icon buttons, including the previously-invisible export option) — the same discoverability fix already applied once this session to the tree row's actions menu.
 - Added a clear (X) button to the Learning page search input.
-- Learning page tabs redesigned: Active now shows every item regardless of status (previously excluded completed ones); Completed unchanged; new Favs tab (flat list, any depth, user-toggled via a hover-revealed star on each row) — backed by a new `is_favorite` column, migration, and `PATCH /items/:id/favorite` endpoint.
+- Learning page tabs redesigned: Active now shows every item regardless of status (previously excluded completed ones); Completed unchanged; new Favs tab — backed by a new `is_favorite` column, migration, and `PATCH /items/:id/favorite` endpoint. **Corrected after direct feedback**: Favs is a root-level filter exactly like Completed (a favorited top-level topic shows with its entire subtree and the full List/Map toggle), not a separate flat any-depth list — only top-level topics can be favorited at all, enforced server-side.
 
 ## Features In Progress
 None — Milestone 4 not yet started.

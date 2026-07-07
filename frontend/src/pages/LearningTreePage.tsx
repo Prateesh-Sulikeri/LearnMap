@@ -5,10 +5,8 @@ import { useLearningTree } from '@/hooks/useLearningTree'
 import { useCollapsedState } from '@/hooks/useCollapsedState'
 import { useTreeViewMode } from '@/hooks/useTreeViewMode'
 import { findNodeById, findRootContaining, nodeMatchesSearch } from '@/utils/tree'
-import { flattenPreOrder } from '@/utils/treeNumbering'
 import { TreeNode } from '@/components/TreeNode'
 import { OrgChartTree } from '@/components/tree/OrgChartTree'
-import { FavoritesList } from '@/components/tree/FavoritesList'
 import { NotesEditorDialog } from '@/components/notes/NotesEditorDialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -17,6 +15,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 
 type MapTab = 'active' | 'completed' | 'favs'
+
+const EMPTY_TAB_MESSAGE: Record<MapTab, string> = {
+  active: 'Nothing here yet.',
+  completed: "You haven't completed any top-level topics yet.",
+  favs: 'Nothing favorited yet — hover a top-level topic in Active or Completed and tap the star to add it here.',
+}
 
 export default function LearningTreePage() {
   // Tab and search live in the URL (not local state) so the breadcrumb in
@@ -82,20 +86,21 @@ export default function LearningTreePage() {
     )
   }
 
-  // Active shows everything, unfiltered. Completed is the old behavior —
-  // only a completed *top-level* topic moves there (a completed sub-item
-  // under a still-active parent stays put, since the parent as a whole
-  // isn't done). Favs is a flat cut across the whole tree at any depth, not
-  // a root-level filter — a favorite can be a deeply-nested sub-item.
+  // Each tab is just a different root-level filter over the same tree —
+  // Favs is a filter exactly like Completed, not a separate view: a
+  // favorited topic carries its whole subtree with it, same as any other
+  // root-level filter, and gets the same List/Map rendering.
   const completedCount = tree.filter((node) => node.status === 'completed').length
-  const favoriteFlat = flattenPreOrder(tree).filter((node) => node.is_favorite)
-  const tabTree = tab === 'completed' ? tree.filter((node) => node.status === 'completed') : tree
+  const favoriteCount = tree.filter((node) => node.is_favorite).length
+  const tabTree =
+    tab === 'completed'
+      ? tree.filter((node) => node.status === 'completed')
+      : tab === 'favs'
+        ? tree.filter((node) => node.is_favorite)
+        : tree
 
   const trimmedQuery = searchQuery.trim().toLowerCase()
   const visibleTree = trimmedQuery ? tabTree.filter((node) => nodeMatchesSearch(node, trimmedQuery)) : tabTree
-  const visibleFavorites = trimmedQuery
-    ? favoriteFlat.filter((node) => node.title.toLowerCase().includes(trimmedQuery))
-    : favoriteFlat
 
   return (
     <div className="space-y-4">
@@ -130,7 +135,7 @@ export default function LearningTreePage() {
         >
           <Star className="size-4" />
           Favs
-          {favoriteFlat.length > 0 && <span className="font-mono text-xs text-muted-foreground">{favoriteFlat.length}</span>}
+          {favoriteCount > 0 && <span className="font-mono text-xs text-muted-foreground">{favoriteCount}</span>}
         </Button>
       </div>
 
@@ -156,30 +161,28 @@ export default function LearningTreePage() {
           )}
         </div>
 
-        {tab !== 'favs' && (
-          <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border p-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={cn('gap-1.5', viewMode === 'list' && 'bg-accent text-accent-foreground')}
-              onClick={() => setViewMode('list')}
-            >
-              <List className="size-4" />
-              List
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={cn('gap-1.5', viewMode === 'chart' && 'bg-accent text-accent-foreground')}
-              onClick={() => setViewMode('chart')}
-            >
-              <Workflow className="size-4" />
-              Map
-            </Button>
-          </div>
-        )}
+        <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border p-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn('gap-1.5', viewMode === 'list' && 'bg-accent text-accent-foreground')}
+            onClick={() => setViewMode('list')}
+          >
+            <List className="size-4" />
+            List
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn('gap-1.5', viewMode === 'chart' && 'bg-accent text-accent-foreground')}
+            onClick={() => setViewMode('chart')}
+          >
+            <Workflow className="size-4" />
+            Map
+          </Button>
+        </div>
 
         <Tooltip>
           <TooltipTrigger
@@ -197,18 +200,8 @@ export default function LearningTreePage() {
         </Tooltip>
       </div>
 
-      {tab === 'favs' ? (
-        favoriteFlat.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nothing favorited yet — hover an item in Active or Completed and tap the star to add it here.
-          </p>
-        ) : visibleFavorites.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No favorites match &quot;{searchQuery}&quot;.</p>
-        ) : (
-          <FavoritesList items={visibleFavorites} onOpenNotes={setNotesItemId} />
-        )
-      ) : tabTree.length === 0 ? (
-        <p className="text-sm text-muted-foreground">You haven&apos;t completed any top-level topics yet.</p>
+      {tabTree.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{EMPTY_TAB_MESSAGE[tab]}</p>
       ) : visibleTree.length === 0 ? (
         <p className="text-sm text-muted-foreground">No items match &quot;{searchQuery}&quot;.</p>
       ) : viewMode === 'list' ? (

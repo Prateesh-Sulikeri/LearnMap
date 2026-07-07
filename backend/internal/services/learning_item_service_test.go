@@ -218,6 +218,23 @@ func TestLearningItemService_SetFavorite_RejectsAnotherUsersItem(t *testing.T) {
 	require.Error(t, err, "Bob must not be able to favorite Alice's item")
 }
 
+func TestLearningItemService_SetFavorite_RejectsNonRootItem(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	parent, err := deps.items.Create(userA, services.CreateItemInput{Title: "Backend"})
+	require.NoError(t, err)
+	child, err := deps.items.Create(userA, services.CreateItemInput{Title: "Kafka", ParentID: &parent.ID})
+	require.NoError(t, err)
+
+	_, err = deps.items.SetFavorite(userA, child.ID, true)
+	require.Error(t, err, "only top-level topics can be favorited, not a nested sub-item")
+
+	favorited, err := deps.items.SetFavorite(userA, parent.ID, true)
+	require.NoError(t, err, "a top-level topic must be favoritable")
+	require.True(t, favorited.IsFavorite)
+}
+
 func TestLearningItemService_DeletePermanently_HardDeletesWholeSubtree(t *testing.T) {
 	deps, createUser := setupItemService(t)
 	userA := createUser("alice@example.com")

@@ -8,8 +8,8 @@
 - Fixed: `NumberBadge` was a fixed-size circle that would clip longer labels; now grows into a pill for labels beyond 1-2 characters.
 - Fixed: the export-as-markdown option was invisible, buried as one of four unlabeled icon buttons in the notes editor header. Consolidated into a single "..." dropdown with icon+text items (add sub-item, export note, export topic), matching the same discoverability fix already applied once this session to the tree row actions menu.
 - Added a clear (X) button to the Learning page's search input.
-- Changed: Learning page tabs redesigned — Active now shows every item regardless of status (previously it excluded completed ones); Completed is unchanged; added a new Favs tab, a flat list of favorited items at any depth in the tree.
-- Added `is_favorite` on learning items end to end: migration, model field, `PATCH /items/:id/favorite`, and a hover-revealed star toggle on tree rows.
+- Changed: Learning page tabs redesigned — Active now shows every item regardless of status (previously it excluded completed ones); Completed is unchanged; added a new Favs tab, which — like Completed — is just a root-level filter over the same tree (a favorited top-level topic shows with its entire subtree, full List/Map toggle included), not a separate flat view.
+- Added `is_favorite` on learning items end to end: migration, model field, `PATCH /items/:id/favorite` (server-side rejects favoriting anything but a top-level topic), and a hover-revealed star toggle on root-level tree rows only.
 
 ### Notes-system Todo pass, streak ranks, and focus mode (2026-07-07)
 - Added a streak rank system (7 fire-themed tiers keyed off `current_streak`): badge on the Profile stat card, an all-ranks reference dialog, rank shown in the sidebar.

@@ -140,9 +140,10 @@ func (s *LearningItemService) SetStatus(userID, itemID uuid.UUID, status models.
 	return item, nil
 }
 
-// SetFavorite toggles whether itemID shows up in the Favs tab — a plain
-// user-chosen flag, independent of status (a favorite can be active or
-// completed) and independent of the tree position (no cascade to children).
+// SetFavorite toggles whether itemID (and its whole subtree) shows up in the
+// Favs tab — only a top-level topic can be favorited, since favoriting
+// carries the entire topic along with its children, not an individual
+// sub-item on its own.
 func (s *LearningItemService) SetFavorite(userID, itemID uuid.UUID, favorite bool) (*models.LearningItem, error) {
 	item, err := s.items.GetByID(userID, itemID)
 	if err != nil {
@@ -150,6 +151,9 @@ func (s *LearningItemService) SetFavorite(userID, itemID uuid.UUID, favorite boo
 	}
 	if item == nil {
 		return nil, apperror.NotFound("learning item not found")
+	}
+	if favorite && item.ParentID != nil {
+		return nil, apperror.Validation("only top-level topics can be favorited", map[string]string{"item_id": "not a top-level topic"})
 	}
 
 	item.IsFavorite = favorite

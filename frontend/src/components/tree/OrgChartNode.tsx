@@ -24,9 +24,11 @@ interface OrgChartNodeProps {
   isCollapsed: (id: string) => boolean
   onToggle: (id: string) => void
   onOpenNotes: (id: string) => void
+  /** Only a top-level topic can be favorited — it carries its whole subtree into the Favs tab, not an individual sub-item. */
+  isRoot?: boolean
 }
 
-export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes }: OrgChartNodeProps) {
+export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes, isRoot = false }: OrgChartNodeProps) {
   const hasChildren = node.children.length > 0
   const collapsed = isCollapsed(node.id)
   const completed = node.status === 'completed'
@@ -80,16 +82,18 @@ export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes }: OrgCh
 
         <NoteIndicator note={node.description} onClick={() => onOpenNotes(node.id)} />
 
-        <button
-          type="button"
-          onClick={() => toggleFavorite.mutate()}
-          disabled={toggleFavorite.isPending}
-          aria-label={node.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-          className="shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 data-[active=true]:opacity-100"
-          data-active={node.is_favorite}
-        >
-          <Star className={cn('size-3.5', node.is_favorite ? 'fill-primary text-primary' : 'text-muted-foreground')} />
-        </button>
+        {isRoot && (
+          <button
+            type="button"
+            onClick={() => toggleFavorite.mutate()}
+            disabled={toggleFavorite.isPending}
+            aria-label={node.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+            className="shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 data-[active=true]:opacity-100"
+            data-active={node.is_favorite}
+          >
+            <Star className={cn('size-3.5', node.is_favorite ? 'fill-primary text-primary' : 'text-muted-foreground')} />
+          </button>
+        )}
 
         {hasChildren && (
           <span className="font-mono text-xs text-muted-foreground">
