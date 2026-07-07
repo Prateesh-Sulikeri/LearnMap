@@ -83,7 +83,10 @@ export function UserMenu({ variant, currentStreak = 0 }: UserMenuProps) {
           <UserRound className="size-4" />
           My Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={toggleTheme} className="flex items-center gap-3">
+        <DropdownMenuItem
+          onClick={(e) => toggleTheme({ x: e.clientX, y: e.clientY })}
+          className="flex items-center gap-3"
+        >
           {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
         </DropdownMenuItem>

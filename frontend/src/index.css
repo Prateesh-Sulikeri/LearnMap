@@ -221,3 +221,39 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="datetime-local"][type="number"] {
   -moz-appearance: textfield;
 }
+
+/* Themed scrollbars (both axes) — thin, rounded, inset from the edge, using
+   the same warm-neutral tokens as everything else, so they don't default to
+   a jarring OS-chrome gray in either theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tree-line) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--tree-line);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* View Transitions circular reveal (see useTheme.tsx) — suppress the
+   built-in crossfade so only our clip-path circle animation shows. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
