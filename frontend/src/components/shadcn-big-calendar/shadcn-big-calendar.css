@@ -105,12 +105,8 @@ button.rbc-input::-moz-focus-inner {
   z-index: 4;
 }
 .rbc-today {
-  background-color: var(--background);
-  background-image: repeating-linear-gradient(
-    -45deg,
-    var(--background) 0 10px,
-    var(--muted) 10px 12px
-  );
+  background-color: color-mix(in oklab, var(--primary) 15%, transparent) !important;
+  border-left: 3px solid var(--primary) !important;
 }
 .rbc-toolbar {
   display: -webkit-flex;
