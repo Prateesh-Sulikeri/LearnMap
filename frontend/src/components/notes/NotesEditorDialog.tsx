@@ -66,12 +66,19 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
   return (
     <Dialog open={node !== null} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn(
-          'flex gap-0 overflow-hidden p-0',
+        showCloseButton={false}
+        className={cn('flex gap-0 overflow-hidden p-0', !focusMode && 'h-[85dvh] sm:max-w-xl lg:max-w-2xl')}
+        // Focus mode uses an inline style, not Tailwind classes, to force
+        // fullscreen — the base dialog sets sm:max-w-sm (a *variant*-scoped
+        // class), which an unprefixed max-w-none override doesn't cancel
+        // (tailwind-merge treats "sm:" as a separate bucket from unprefixed),
+        // so the dialog silently stayed pinned to ~384px wide at >=640px
+        // viewports. An inline style always wins regardless of that.
+        style={
           focusMode
-            ? 'top-0 left-0 h-screen w-screen max-w-none translate-x-0 translate-y-0 rounded-none'
-            : 'h-[85dvh] sm:max-w-xl lg:max-w-2xl',
-        )}
+            ? { position: 'fixed', inset: 0, transform: 'none', width: '100vw', height: '100dvh', maxWidth: 'none', borderRadius: 0 }
+            : undefined
+        }
       >
         {/* Focus mode's persistent side tree — the whole topic (rootAncestor
             down), not just the current item's children, so every related
@@ -97,7 +104,11 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
                       variant="ghost"
                       size="icon-sm"
                       className="shrink-0"
-                      onClick={() => setFocusMode((f) => !f)}
+                      onClick={() => {
+                        const next = !focusMode
+                        setFocusMode(next)
+                        if (next) setTab('preview')
+                      }}
                     />
                   }
                 >
