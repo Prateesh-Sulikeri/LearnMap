@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarClock, Plus, Trash2 } from 'lucide-react'
+import moment from 'moment'
+import { momentLocalizer } from 'react-big-calendar'
 import { sessionsApi } from '@/services/sessionsApi'
 import { itemsApi } from '@/services/itemsApi'
 import { Button } from '@/components/ui/button'
@@ -8,6 +10,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
 import { DeleteSessionDialog } from '@/components/DeleteSessionDialog'
+import ShadcnBigCalendar from '@/components/shadcn-big-calendar/shadcn-big-calendar'
+
+const localizer = momentLocalizer(moment)
 
 export default function StudySessionsPage() {
   const [addOpen, setAddOpen] = useState(false)
@@ -21,6 +26,15 @@ export default function StudySessionsPage() {
   const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: itemsApi.list })
 
   const titleByItemId = new Map(items.map((item) => [item.id, item.title]))
+
+  const calendarEvents = (sessions ?? []).map((session) => {
+    const start = new Date(session.session_date)
+    return {
+      title: `${titleByItemId.get(session.learning_item_id) ?? 'Unknown'} (${session.hours}h)`,
+      start,
+      end: new Date(start.getTime() + session.hours * 60 * 60 * 1000),
+    }
+  })
 
   return (
     <div className="space-y-4">
@@ -41,6 +55,17 @@ export default function StudySessionsPage() {
 
       {isError && (
         <p className="text-sm text-destructive">Couldn&apos;t load your sessions. Try refreshing the page.</p>
+      )}
+
+      {sessions && (
+        <div className="rounded-xl border border-border p-2">
+          <ShadcnBigCalendar
+            localizer={localizer}
+            events={calendarEvents}
+            style={{ height: 650 }}
+            eventPropGetter={() => ({ className: 'event-variant-primary' })}
+          />
+        </div>
       )}
 
       {sessions && sessions.length === 0 && (

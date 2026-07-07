@@ -12,12 +12,16 @@ This file exists so the next session can pick up cleanly without re-deriving con
 Add filter controls (topic at least; consider date-range) above the session list. Default the visible range to the last 7 days rather than showing everything. Note: once item 2 below replaces the table with a calendar, "default to 1 week" most naturally maps to **defaulting the calendar's view to Week** rather than a literal date-range filter on a table — reconsider this item's shape once the calendar exists rather than building a table filter that's about to be replaced.
 
 ### 2. Replace the table with a Teams-style (day/week/month) calendar
-**Decision already made — do not re-research:** use **schedule-x** (`@schedule-x/react` + view plugins). Chosen after comparing it against react-big-calendar, FullCalendar, and a shadcn community block (`list-jonas/shadcn-ui-big-calendar`). Reasoning: current React 19 support, a CSS-custom-property theming model that maps cleanly onto this app's Tailwind v4 tokens (the others fight you with deeply-nested `.rbc-*`/`.fc-*` class overrides), and no forced/built-in event modal to collide with Base UI's own Dialog primitive (schedule-x's modal is opt-in — skip it and wire selection callbacks into a Base UI Dialog instead).
+**Superseded — the user explicitly chose the shadcn registry block instead of schedule-x.** Installed and added: `npx shadcn@latest add list-jonas/shadcn-ui-big-calendar/big-calendar` (a shadcn-registry wrapper around `react-big-calendar` + `moment`, zero Radix dependency — confirmed by reading its source, so it's safe alongside this project's Base UI setup). Added to `frontend/src/components/shadcn-big-calendar/shadcn-big-calendar.{ts,css}`.
 
-Not yet done:
-- `npm install @schedule-x/react` + the calendar core + month/week/day view plugins + `@schedule-x/theme-default` (or build a custom theme via its CSS variables).
-- Replace `StudySessionsPage`'s table with the calendar, defaulting to **Week** view.
-- Theme it to match the app's palette (warm yellow accent, light theme only, rounded corners) via schedule-x's CSS variable overrides — this is the intended integration point, not `.fc-*`/`.rbc-*` style overriding.
+**Done:** `StudySessionsPage.tsx` now renders `ShadcnBigCalendar` above the existing table (table intentionally left in place — "nothing else" was the explicit instruction for this pass), fed real events built from `sessions` (`title`, `start`, `end` derived from `session_date` + `hours`). Default `react-big-calendar` toolbar already provides the Month/Week/Day/Agenda toggle — no extra code needed for that part.
+
+**Not done / still open:**
+- No theming pass yet — it's using the shadcn-big-calendar block's own default CSS variables, not yet matched to this app's actual palette/tokens (warm yellow accent, radii, shadows). Revisit before calling this visually finished.
+- Still shows the OLD table too (not replaced) — decide whether to keep both or drop the table once the calendar is trusted.
+- Doesn't default to Week view (react-big-calendar defaults to Month) — "default to 1 week" from item 1 above is still unaddressed.
+- `event-form` companion registry item (`list-jonas/shadcn-ui-big-calendar/event-form`) was deliberately NOT installed — it pulls in Radix-based `form`/`input`/`button`, which would need reconciling with this project's Base UI setup. Any create/edit-event dialog should be hand-built with this project's own `Dialog`/`Button`/`Input`, not that companion piece.
+- schedule-x is no longer the plan; don't reintroduce it unless asked again.
 
 ### 3. Scheduling + honor-system completion
 A **new concept**, distinct from the existing "log a session after the fact" flow: reserve a future time block for a topic, then confirm you actually did it once the time passes.
