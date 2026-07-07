@@ -63,7 +63,7 @@ export function ProfileStatCard({ user, dashboard }: ProfileStatCardProps) {
             <p className="text-xs text-muted-foreground">learnmap.app</p>
           </div>
 
-          <StreakRankBadge streakDays={currentStreak} size="lg" showProgress />
+          <StreakRankBadge streakDays={currentStreak} size="lg" showProgress onClick={() => setAllRanksOpen(true)} />
 
           <div className="grid w-full grid-cols-2 gap-3">
             <div className="rounded-xl bg-card px-3 py-4 ring-1 ring-foreground/10">
@@ -79,14 +79,14 @@ export function ProfileStatCard({ user, dashboard }: ProfileStatCardProps) {
           </div>
         </div>
       </CardContent>
-      <CardFooter className="gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => void handleExport()}>
-          <Download className="size-4" />
-          Export as image
-        </Button>
-        <Button variant="ghost" onClick={() => setAllRanksOpen(true)}>
+      <CardFooter className="flex-col gap-2 sm:flex-row">
+        <Button variant="outline" className="w-full sm:flex-1" onClick={() => setAllRanksOpen(true)}>
           <Medal className="size-4" />
           View all ranks
+        </Button>
+        <Button className="w-full sm:flex-1" onClick={() => void handleExport()}>
+          <Download className="size-4" />
+          Export as image
         </Button>
       </CardFooter>
 
