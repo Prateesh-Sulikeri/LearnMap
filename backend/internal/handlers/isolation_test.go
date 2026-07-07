@@ -198,6 +198,27 @@ func TestCrossUserIsolation_Trash(t *testing.T) {
 	require.NoError(t, json.Unmarshal(trashRec.Body.Bytes(), &aliceTrash))
 	require.Len(t, aliceTrash, 1)
 	require.Equal(t, itemID, aliceTrash[0].ID)
+
+	// Bob must not be able to permanently delete Alice's trashed item by
+	// guessing its id, nor wipe it out via his own Empty Trash call.
+	permReq := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+itemID+"/permanent", nil)
+	permReq.Header.Set("Authorization", "Bearer "+bobToken)
+	permRec := httptest.NewRecorder()
+	router.ServeHTTP(permRec, permReq)
+	require.Equal(t, http.StatusNotFound, permRec.Code, "Bob must not be able to purge Alice's deleted item")
+
+	emptyReq := httptest.NewRequest(http.MethodDelete, "/api/v1/items/trash", nil)
+	emptyReq.Header.Set("Authorization", "Bearer "+bobToken)
+	emptyRec := httptest.NewRecorder()
+	router.ServeHTTP(emptyRec, emptyReq)
+	require.Equal(t, http.StatusOK, emptyRec.Code)
+
+	trashReq = httptest.NewRequest(http.MethodGet, "/api/v1/items/trash", nil)
+	trashReq.Header.Set("Authorization", "Bearer "+aliceToken)
+	trashRec = httptest.NewRecorder()
+	router.ServeHTTP(trashRec, trashReq)
+	require.NoError(t, json.Unmarshal(trashRec.Body.Bytes(), &aliceTrash))
+	require.Len(t, aliceTrash, 1, "Bob emptying his own (empty) trash must not touch Alice's")
 }
 
 func TestUnauthenticatedRequestsAreRejected(t *testing.T) {

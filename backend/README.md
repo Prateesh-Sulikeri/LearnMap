@@ -41,6 +41,12 @@ docker run -d --name learnmap-backend --network learnmapapp_default \
   golang:latest sh -c "go run ./cmd/server"
 ```
 
+for cmd:
+```bash
+docker run -d --name learnmap-backend --network learnmapapp_default -p 8080:8080 -v "%cd%:/app" -w /app -e DATABASE_URL="postgres://learnmap:learnmap_dev_password@postgres:5432/learnmap?sslmode=disable" -e JWT_SECRET="dev-only-secret-not-for-production-please-change" -e INVITE_CODE="pilot2026" -e CORS_ALLOWED_ORIGINS="http://localhost:5173" -e REFRESH_COOKIE_SECURE="false" golang:latest sh -c "go run ./cmd/server"
+5d5ee8e8dbbf3b6e67c7be80e9fed751b0d906e43e9f6a0028339185fda8c37f
+```
+
 (On Windows Git Bash, prefix with `MSYS_NO_PATHCONV=1` so the `-v` path
 and `/app` argument aren't mangled, and use the full Windows path for
 `$(pwd)/backend` if `pwd` doesn't resolve the way you expect.)

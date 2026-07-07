@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { CircleCheck, List, ListTree, NotepadText, Search, Trash2, Workflow } from 'lucide-react'
 import { useLearningTree } from '@/hooks/useLearningTree'
 import { useCollapsedState } from '@/hooks/useCollapsedState'
 import { useTreeViewMode } from '@/hooks/useTreeViewMode'
 import { findNodeById, findRootContaining, nodeMatchesSearch } from '@/utils/tree'
+import { computeNumbering } from '@/utils/treeNumbering'
 import { TreeNode } from '@/components/TreeNode'
 import { OrgChartTree } from '@/components/tree/OrgChartTree'
 import { NotesEditorDialog } from '@/components/notes/NotesEditorDialog'
@@ -17,8 +18,28 @@ import { cn } from '@/lib/utils'
 type MapTab = 'active' | 'completed'
 
 export default function LearningTreePage() {
-  const [tab, setTab] = useState<MapTab>('active')
-  const [searchQuery, setSearchQuery] = useState('')
+  // Tab and search live in the URL (not local state) so the breadcrumb in
+  // AppLayout can link to a specific tab/search — "Learning / Completed" or
+  // "Learning / Backend" as real, shareable, back-button-friendly links.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab: MapTab = searchParams.get('tab') === 'completed' ? 'completed' : 'active'
+  const searchQuery = searchParams.get('q') ?? ''
+  const setTab = (next: MapTab) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      if (next === 'active') params.delete('tab')
+      else params.set('tab', next)
+      return params
+    })
+  }
+  const setSearchQuery = (next: string) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      if (next) params.set('q', next)
+      else params.delete('q')
+      return params
+    })
+  }
   const [viewMode, setViewMode] = useTreeViewMode()
   const [notesItemId, setNotesItemId] = useState<string | null>(null)
   const { tree, isLoading, isError } = useLearningTree()
@@ -65,6 +86,7 @@ export default function LearningTreePage() {
   const completedCount = tree.filter((node) => node.status === 'completed').length
   const tabTree = tree.filter((node) => (tab === 'completed') === (node.status === 'completed'))
   const visibleTree = searchQuery.trim() ? tabTree.filter((node) => nodeMatchesSearch(node, searchQuery)) : tabTree
+  const numbering = computeNumbering(visibleTree)
 
   return (
     <div className="space-y-4">
@@ -159,13 +181,20 @@ export default function LearningTreePage() {
               isCollapsed={isCollapsed}
               onToggle={toggle}
               onOpenNotes={setNotesItemId}
+              numbering={numbering}
               isLast={index === visibleTree.length - 1}
               ancestorLines={[]}
             />
           ))}
         </ul>
       ) : (
-        <OrgChartTree tree={visibleTree} isCollapsed={isCollapsed} onToggle={toggle} onOpenNotes={setNotesItemId} />
+        <OrgChartTree
+          tree={visibleTree}
+          isCollapsed={isCollapsed}
+          onToggle={toggle}
+          onOpenNotes={setNotesItemId}
+          numbering={numbering}
+        />
       )}
 
       <NotesEditorDialog

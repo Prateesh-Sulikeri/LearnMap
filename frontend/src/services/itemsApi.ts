@@ -22,4 +22,7 @@ export const itemsApi = {
   listTrash: () => apiClient.get<TrashedItem[]>('/items/trash').then((r) => r.data),
   restore: (id: string) =>
     apiClient.post<RestoreItemResponse>(`/items/${id}/restore`).then((r) => r.data),
+  deletePermanently: (id: string) =>
+    apiClient.delete<DeleteItemResponse>(`/items/${id}/permanent`).then((r) => r.data),
+  emptyTrash: () => apiClient.delete<DeleteItemResponse>('/items/trash').then((r) => r.data),
 }

@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { NoteIndicator } from '@/components/tree/NoteIndicator'
+import { NumberBadge } from '@/components/tree/NumberBadge'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
 import { DeleteItemDialog } from '@/components/DeleteItemDialog'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
@@ -24,9 +25,11 @@ interface OrgChartNodeProps {
   isCollapsed: (id: string) => boolean
   onToggle: (id: string) => void
   onOpenNotes: (id: string) => void
+  /** "1"/"1a"/"1a1"-style label per node id, computed once for the whole visible tree. */
+  numbering: Map<string, string>
 }
 
-export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes }: OrgChartNodeProps) {
+export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes, numbering }: OrgChartNodeProps) {
   const hasChildren = node.children.length > 0
   const collapsed = isCollapsed(node.id)
   const completed = node.status === 'completed'
@@ -63,6 +66,8 @@ export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes }: OrgCh
             <Circle className="size-4 text-muted-foreground hover:text-foreground" />
           )}
         </button>
+
+        <NumberBadge label={numbering.get(node.id) ?? ''} />
 
         <button
           type="button"
@@ -128,7 +133,14 @@ export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes }: OrgCh
       {hasChildren && !collapsed && (
         <ul>
           {node.children.map((child) => (
-            <OrgChartNode key={child.id} node={child} isCollapsed={isCollapsed} onToggle={onToggle} onOpenNotes={onOpenNotes} />
+            <OrgChartNode
+              key={child.id}
+              node={child}
+              isCollapsed={isCollapsed}
+              onToggle={onToggle}
+              onOpenNotes={onOpenNotes}
+              numbering={numbering}
+            />
           ))}
         </ul>
       )}

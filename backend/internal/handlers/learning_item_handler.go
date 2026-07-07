@@ -254,3 +254,33 @@ func (h *LearningItemHandler) Restore(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"restored_count": count})
 }
+
+// DeletePermanently hard-deletes a single trash item (and its already
+// soft-deleted descendants) — no recovery possible afterward.
+func (h *LearningItemHandler) DeletePermanently(c *gin.Context) {
+	userID := middleware.UserIDFromContext(c)
+	itemID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		RespondValidationError(c, errors.New("invalid item id"))
+		return
+	}
+
+	count, svcErr := h.service.DeletePermanently(userID, itemID)
+	if svcErr != nil {
+		RespondError(c, svcErr)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted_count": count})
+}
+
+// EmptyTrash hard-deletes every currently-trashed item for the user — no
+// recovery possible afterward.
+func (h *LearningItemHandler) EmptyTrash(c *gin.Context) {
+	userID := middleware.UserIDFromContext(c)
+	count, err := h.service.EmptyTrash(userID)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted_count": count})
+}

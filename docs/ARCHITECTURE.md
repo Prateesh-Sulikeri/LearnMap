@@ -216,8 +216,10 @@ Base path `/api/v1`. All routes except `auth/register`, `auth/login`, `auth/refr
 | DELETE | /sessions/:id                  | yes  | delete a session                          |
 | GET    | /dashboard                     | yes  | aggregate dashboard payload                |
 | GET    | /stats?range=week\|month\|year | yes  | chart data                                 |
-| GET    | /items/trash                    | yes  | list soft-deleted "trash roots" (ADR-003)  |
+| GET    | /items/trash                    | yes  | list soft-deleted "trash roots" (ADR-003); also lazily purges anything past the 7-day retention period (ADR-026) |
+| DELETE | /items/trash                    | yes  | "Empty Trash" — hard-delete everything currently in the trash |
 | POST   | /items/:id/restore               | yes  | undo a soft-delete, cascades like Delete   |
+| DELETE | /items/:id/permanent              | yes  | hard-delete a single trash item + descendants, no recovery |
 | POST   | /uploads                          | yes  | upload an image (for notes), returns a URL |
 | GET    | /uploads/*filepath                | none | serves uploaded images (see ADR-022)       |
 | GET    | /health                         | none | liveness/readiness check                  |

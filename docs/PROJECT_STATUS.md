@@ -1,6 +1,6 @@
 # LearnMap.app — Project Status
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-07 (notes-system Todo pass)
 
 ## Current Milestone
 Milestone 4 — Charts & Statistics (not started; a substantial UX/feature pass happened first — see below)
@@ -28,6 +28,20 @@ Hosted, multi-user learning tracker with authentication and profiles, used from 
 - Learning page: top-down org-chart view (`OrgChartTree`) as an alternative to the indented list (per-user toggle, both fully editable), Active/Completed tabs split on top-level topics, page-local search (removed the old global search bar from `AppLayout` — it was dead everywhere but this page)
 - Full notes feature: markdown + toolbar (bold/italic/headers/code/image) + live preview, in a large dialog; images upload from the device via a new `/uploads` endpoint (local disk — ADR-022); a root topic's notes auto-generate a table of contents from its sub-topics, each entry linking to that sub-topic's own notes
 - Profile page: shareable stat card (streak, most-time topic, avatar) exportable as a PNG; ordinal joined-date wording ("Joined March 22nd 2026"); avatar now actually renders (profile card + sidebar) instead of being a write-only field
+- Streak rank system (7 fire-themed tiers keyed off `current_streak`), badge on the Profile stat card, all-ranks reference dialog, rank shown in the sidebar
+- Focus mode for notes: fullscreen (via a `createPortal`, bypassing the Dialog primitive entirely after two CSS-based attempts both failed in the browser), collapsible side tree of the whole topic, defaults to Preview
+
+**Notes-system Todo pass (2026-07-07)**, working through `docs/Todo` (user-authored feature/bug list) end to end:
+- Copy-code "Copied!" confirmation; markdown-help text hidden outside Write mode
+- Save behavior fixed: saving while in focus mode now persists without exiting/closing (previously always closed); mark-complete/reopen and "add sub-item" now work from inside the notes editor (focus mode or not)
+- Ctrl/Cmd+S saves (browser's own Save Page prevented); debounced auto-save after ~2.5s idle; any close path (Cancel, backdrop, Escape) saves first if there's unsaved work
+- Hierarchical numbering ("1"/"1a"/"1a1"-style, alternating numeric/alpha per depth) shown as circular badges on every tree view (list, org-chart, focus-mode side tree); the focus-mode side tree, when collapsed, shows a thin rail of just the badges instead of nothing
+- Rich markdown: GFM (tables, task lists, strikethrough) via `remark-gfm`, syntax-highlighted code blocks via `rehype-highlight` with a small custom light-theme palette (not UI semantic colors, to avoid e.g. a number literal reading as an error); image size presets (Small/Medium/Large/Original) via the standard markdown title-attribute slot, no raw HTML
+- Trash: "Empty Trash" (with confirmation) and per-item "delete permanently", plus a lazy 7-day retention sweep (hard-deletes anything past the retention window on the next `ListTrash` call — no job scheduler exists in this project, so read-time enforcement stands in for one)
+- Functional breadcrumbs: every segment but the last is a real link; the Learning page's Active/Completed tab and search query moved from local state into URL search params so "Learning / Completed" is an actual shareable link, not just a label
+- Markdown export: a single note as a `.md` download, or a whole topic (root + every descendant) as one combined `.md` "notebook" with a generated table of contents — scoped down from the original ask (PDF/DOCX/.zip) per an explicit user decision to keep this batch lightweight; no new heavy dependencies
+
+Three items from the same Todo were explicitly scoped down or deferred after asking the user directly (all picked the lighter option): no interactive/WYSIWYG-editable preview (checkboxes/tables/images stay read-only in Preview — reversing this was declined, keeping the original "markdown + toolbar, not WYSIWYG" decision intact); no PDF/DOCX/.zip export; no raw-HTML/drag-handle image resizing. Drag-and-drop reordering of tree items (also mentioned in the same Todo) was deferred without asking, as a separate, larger feature (needs a DnD library + a new backend endpoint to persist reordered `position`/`parent_id`).
 
 ## Features In Progress
 None — Milestone 4 not yet started.
@@ -43,6 +57,9 @@ Milestone 4 — `/stats` wired into Recharts (weekly hours, monthly hours, top t
 - GORM's default query logging is verbose — should be turned down before deployment (Milestone 6).
 - Test suite requires `go test ./... -p 1` (documented in `.claude/agents/testing-agent.md`).
 - Frontend has no automated test suite yet (unit/component tests for tree assembly, form validation) — the design doc's roadmap doesn't call for one explicitly, but it's worth considering before Milestone 6.
+- Trash retention (auto-purge after 7 days) is enforced lazily on the next `ListTrash` call, not a scheduled background job — there's no job scheduler in this project yet. A user who never re-opens the Trash page keeps expired items around indefinitely (harmlessly, just not purged) until they do.
+- Markdown export's table-of-contents anchor links use a GitHub-style auto-slug guess; not every markdown renderer slugs headings identically, so TOC links may not jump correctly in all viewers (the exported content itself is unaffected).
+- The notes editor's new pure logic (hierarchical numbering, the image-size text rewrite, markdown export) has no dedicated frontend test coverage — same gap as the point above, not a new one.
 - **Note image uploads are stored on local disk** (`/uploads`, ADR-022) — must move to persistent object storage before any deploy to a host without a persistent filesystem. The static serving route is also intentionally unauthenticated (browsers don't send auth headers on `<img>` requests); protected only by unguessable filenames, not real access control.
 - The post-M3 UX pass above was verified via clean backend build/vet/test (including new Go tests), clean frontend build/lint, and full Postman/Newman regression (including live curl end-to-end proof of the upload endpoint) — but not via independent browser-automation click-through (same tooling gap as M2/M3). The notes editor's cursor-insertion mechanics and the notes dialog's internal scroll behavior with a genuinely long note are the two areas most worth a manual click-test before calling this pass fully done.
 - Milestones 2 and 3's UI were verified via clean typecheck/build/lint, a manual API-contract cross-check between frontend services and backend DTOs, and (for M2) real backend request logs proving a live register→me→dashboard flow succeeded — but not via independent browser-automation click-through in this pass (headless browser tooling wasn't set up; the user declined installing it for now). Recommend a manual spot-check of the full click-through flow (and responsive breakpoints) before Milestone 5's dedicated cross-device QA pass.

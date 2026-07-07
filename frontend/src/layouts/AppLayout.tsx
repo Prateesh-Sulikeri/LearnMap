@@ -36,6 +36,38 @@ const PAGE_TITLES: Record<string, string> = {
   '/trash': 'Trash',
 }
 
+interface Crumb {
+  label: string
+  /** Omitted for the current page — the last crumb is never a link to itself. */
+  to?: string
+}
+
+// Real navigation, not just decoration: every crumb but the last is a link.
+// The Learning page's tab/search live in the URL (see LearningTreePage),
+// which is what makes "Learning / Completed" or "Learning / Backend" a real,
+// shareable link rather than a snapshot of local component state.
+function getBreadcrumbs(pathname: string, search: string): Crumb[] {
+  const home: Crumb = { label: 'LearnMap', to: '/dashboard' }
+  const params = new URLSearchParams(search)
+
+  if (pathname === '/tree') {
+    const tab = params.get('tab') === 'completed' ? 'completed' : 'active'
+    const q = params.get('q')
+    const tabLabel = tab === 'completed' ? 'Completed' : 'Active'
+    const tabHref = tab === 'completed' ? '/tree?tab=completed' : '/tree'
+    if (q) {
+      return [home, { label: 'Learning', to: '/tree' }, { label: tabLabel, to: tabHref }, { label: q }]
+    }
+    return [home, { label: 'Learning', to: '/tree' }, { label: tabLabel }]
+  }
+
+  if (pathname === '/trash') {
+    return [home, { label: 'Learning', to: '/tree' }, { label: 'Trash' }]
+  }
+
+  return [home, { label: PAGE_TITLES[pathname] ?? 'LearnMap' }]
+}
+
 // The one layout every authenticated page renders inside. Per the design
 // doc, every page needs a breadcrumb and a floating add button — both live
 // here, not per-page, so they can't drift out of sync across pages. Search
@@ -50,7 +82,7 @@ export default function AppLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const { data: dashboard } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
 
-  const currentTitle = PAGE_TITLES[location.pathname] ?? 'LearnMap'
+  const breadcrumbs = getBreadcrumbs(location.pathname, location.search)
   const rank = getStreakRank(dashboard?.current_streak ?? 0)
   const RankIcon = rank.icon
 
@@ -161,9 +193,19 @@ export default function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-20 md:pb-0">
         {/* Top bar: breadcrumb — present on every page */}
         <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
-          <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
-            <span>LearnMap</span> <span className="mx-1">/</span>{' '}
-            <span className="text-foreground">{currentTitle}</span>
+          <nav aria-label="Breadcrumb" className="flex items-center text-xs text-muted-foreground">
+            {breadcrumbs.map((crumb, i) => (
+              <span key={i} className="flex items-center">
+                {i > 0 && <span className="mx-1">/</span>}
+                {crumb.to ? (
+                  <Link to={crumb.to} className="transition-colors duration-150 hover:text-foreground hover:underline">
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span className="text-foreground">{crumb.label}</span>
+                )}
+              </span>
+            ))}
           </nav>
         </header>
 

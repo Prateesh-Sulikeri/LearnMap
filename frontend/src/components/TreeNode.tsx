@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { TreeGuides } from '@/components/tree/TreeGuides'
 import { NoteIndicator } from '@/components/tree/NoteIndicator'
+import { NumberBadge } from '@/components/tree/NumberBadge'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
 import { DeleteItemDialog } from '@/components/DeleteItemDialog'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
@@ -27,6 +28,8 @@ interface TreeNodeProps {
   onToggle: (id: string) => void
   /** Opens the shared, page-level notes editor for the given item id. */
   onOpenNotes: (id: string) => void
+  /** "1"/"1a"/"1a1"-style label per node id, computed once for the whole visible tree. */
+  numbering: Map<string, string>
   /** Whether this node is the last child among its siblings (see TreeGuides). */
   isLast: boolean
   /** Ancestor continuation guides inherited from the parent (see TreeGuides). */
@@ -38,7 +41,7 @@ interface TreeNodeProps {
 // horizontal space — the "adapted interaction pattern for narrow screens"
 // the roadmap calls for on this page. Connector guide lines (TreeGuides)
 // give the nesting an actual visual tree structure, not just indentation.
-export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, isLast, ancestorLines }: TreeNodeProps) {
+export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, numbering, isLast, ancestorLines }: TreeNodeProps) {
   const hasChildren = node.children.length > 0
   const collapsed = isCollapsed(node.id)
   const completed = node.status === 'completed'
@@ -94,6 +97,8 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, isLa
               <Circle className="size-5 text-muted-foreground hover:text-foreground" />
             )}
           </button>
+
+          <NumberBadge label={numbering.get(node.id) ?? ''} />
 
           {/* Clicking the title toggles expand/collapse too — the chevron shouldn't be the only hit target. */}
           <button
@@ -154,6 +159,7 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, isLa
               isCollapsed={isCollapsed}
               onToggle={onToggle}
               onOpenNotes={onOpenNotes}
+              numbering={numbering}
               isLast={index === node.children.length - 1}
               ancestorLines={[...ancestorLines, !isLast]}
             />

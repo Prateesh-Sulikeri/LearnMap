@@ -106,8 +106,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
+  gap: 0.3em;
+  min-width: 1.75rem;
   height: 1.75rem;
+  padding: 0 0.5em;
+  font-size: 0.75rem;
+  font-family: var(--font-sans);
   border-radius: var(--radius-sm);
   color: var(--muted-foreground);
   background: transparent;
@@ -137,4 +141,114 @@
   color: var(--accent-hover);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.md-preview hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5em 0;
+}
+
+/* GFM tables */
+.md-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75em 0;
+  font-size: 0.9em;
+}
+
+.md-preview th,
+.md-preview td {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.md-preview th {
+  background: var(--muted);
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+/* GFM task lists — checkboxes render read-only (notes stay markdown +
+   toolbar, not an editable preview); the strikethrough communicates state
+   without needing interactivity. */
+.md-preview li.task-list-item {
+  list-style: none;
+  margin-left: -1.5em;
+}
+
+.md-preview li.task-list-item input[type='checkbox'] {
+  margin-right: 0.5em;
+  accent-color: var(--primary);
+}
+
+.md-preview li.task-list-item input[type='checkbox']:checked + * {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+
+/* Syntax highlighting (rehype-highlight / highlight.js classes) — a small
+   dedicated palette rather than reusing UI semantic colors (destructive,
+   warning, etc.), since "red" on a number literal would misleadingly read
+   as an error state. */
+.md-preview .hljs-comment,
+.md-preview .hljs-quote {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.md-preview .hljs-keyword,
+.md-preview .hljs-selector-tag,
+.md-preview .hljs-tag {
+  color: #8250df;
+}
+
+.md-preview .hljs-string,
+.md-preview .hljs-addition,
+.md-preview .hljs-regexp {
+  color: #0a7b3e;
+}
+
+.md-preview .hljs-number,
+.md-preview .hljs-literal,
+.md-preview .hljs-attr {
+  color: #953800;
+}
+
+.md-preview .hljs-title,
+.md-preview .hljs-section,
+.md-preview .hljs-built_in,
+.md-preview .hljs-name {
+  color: #0550ae;
+}
+
+.md-preview .hljs-deletion {
+  color: var(--destructive);
+}
+
+.md-preview .hljs-emphasis {
+  font-style: italic;
+}
+
+.md-preview .hljs-strong {
+  font-weight: 700;
+}
+
+/* Image size presets — set via the toolbar, encoded as a standard markdown
+   title attribute ("size=small|medium|large"), never raw HTML. The
+   img component in MarkdownPreview.tsx parses that marker into one of
+   these classes rather than leaving it as a literal title attribute
+   (which the browser would otherwise render as a confusing hover tooltip
+   reading "size=medium"). */
+.md-preview img.md-img-small {
+  max-width: 200px;
+}
+
+.md-preview img.md-img-medium {
+  max-width: 400px;
+}
+
+.md-preview img.md-img-large {
+  max-width: 640px;
 }

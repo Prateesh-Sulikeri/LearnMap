@@ -7,6 +7,8 @@ interface OrgChartTreeProps {
   isCollapsed: (id: string) => boolean
   onToggle: (id: string) => void
   onOpenNotes: (id: string) => void
+  /** "1"/"1a"/"1a1"-style label per node id, computed once for the whole visible tree. */
+  numbering: Map<string, string>
 }
 
 // A literal top-down tree diagram (root at top, children spreading out
@@ -15,7 +17,7 @@ interface OrgChartTreeProps {
 // editing. Multiple top-level topics each get their own independent
 // diagram, laid out left to right; the whole thing scrolls horizontally on
 // its own so a wide or deep map never breaks the page layout.
-export function OrgChartTree({ tree, isCollapsed, onToggle, onOpenNotes }: OrgChartTreeProps) {
+export function OrgChartTree({ tree, isCollapsed, onToggle, onOpenNotes, numbering }: OrgChartTreeProps) {
   return (
     // min-h-[60vh] keeps the scroll area reliably tall regardless of how
     // shallow the tree is, so the horizontal scrollbar consistently sits
@@ -25,7 +27,13 @@ export function OrgChartTree({ tree, isCollapsed, onToggle, onOpenNotes }: OrgCh
       <div className="flex w-max min-w-full justify-center gap-10 px-2">
         {tree.map((root) => (
           <ul key={root.id} className="org-tree">
-            <OrgChartNode node={root} isCollapsed={isCollapsed} onToggle={onToggle} onOpenNotes={onOpenNotes} />
+            <OrgChartNode
+              node={root}
+              isCollapsed={isCollapsed}
+              onToggle={onToggle}
+              onOpenNotes={onOpenNotes}
+              numbering={numbering}
+            />
           </ul>
         ))}
       </div>

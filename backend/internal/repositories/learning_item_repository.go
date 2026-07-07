@@ -134,3 +134,49 @@ func (r *LearningItemRepository) RestoreItems(userID uuid.UUID, itemIDs []uuid.U
 			Update("deleted_at", nil).Error
 	})
 }
+
+// HardDeleteItems permanently removes every item in itemIDs (already
+// validated by the caller to belong to userID and already be soft-deleted)
+// along with any study_sessions referencing them — no recovery possible
+// after this, unlike SoftDeleteWithSessions.
+func (r *LearningItemRepository) HardDeleteItems(userID uuid.UUID, itemIDs []uuid.UUID) error {
+	if len(itemIDs) == 0 {
+		return nil
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().
+			Where("user_id = ? AND learning_item_id IN ?", userID, itemIDs).
+			Delete(&models.StudySession{}).Error; err != nil {
+			return err
+		}
+		return tx.Unscoped().
+			Where("user_id = ? AND id IN ?", userID, itemIDs).
+			Delete(&models.LearningItem{}).Error
+	})
+}
+
+// ListAllDeletedByUser returns every soft-deleted item for userID
+// (regardless of whether it's a trash root or a descendant that came along
+// with a cascade delete) — used by EmptyTrash and the retention sweep to
+// find every id that needs hard-deleting, not just the roots ListTrash shows.
+func (r *LearningItemRepository) ListAllDeletedByUser(userID uuid.UUID) ([]models.LearningItem, error) {
+	var items []models.LearningItem
+	err := r.db.Unscoped().Where("user_id = ? AND deleted_at IS NOT NULL", userID).Find(&items).Error
+	return items, err
+}
+
+// ListDeletedRootsOlderThan returns trash roots (same definition as
+// ListDeletedRootsByUser) whose deleted_at is before cutoff — used by the
+// retention sweep to find what's aged out.
+func (r *LearningItemRepository) ListDeletedRootsOlderThan(userID uuid.UUID, cutoff time.Time) ([]models.LearningItem, error) {
+	var items []models.LearningItem
+	err := r.db.Unscoped().
+		Where(`user_id = ? AND deleted_at IS NOT NULL AND deleted_at < ? AND (
+			parent_id IS NULL OR EXISTS (
+				SELECT 1 FROM learning_items parent
+				WHERE parent.id = learning_items.parent_id AND parent.deleted_at IS NULL
+			)
+		)`, userID, cutoff).
+		Find(&items).Error
+	return items, err
+}

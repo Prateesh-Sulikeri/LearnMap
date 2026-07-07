@@ -11,12 +11,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 type itemTestDeps struct {
 	items    *services.LearningItemService
 	itemRepo *repositories.LearningItemRepository
 	sessions *repositories.StudySessionRepository
+	db       *gorm.DB
 }
 
 func setupItemService(t *testing.T) (itemTestDeps, func(email string) uuid.UUID) {
@@ -37,7 +39,7 @@ func setupItemService(t *testing.T) (itemTestDeps, func(email string) uuid.UUID)
 		return u.ID
 	}
 
-	return itemTestDeps{items: itemService, itemRepo: itemRepo, sessions: sessionRepo}, createUser
+	return itemTestDeps{items: itemService, itemRepo: itemRepo, sessions: sessionRepo, db: db}, createUser
 }
 
 func TestLearningItemService_Create_RejectsParentBelongingToAnotherUser(t *testing.T) {
@@ -184,6 +186,129 @@ func TestLearningItemService_Restore_RejectsAnotherUsersDeletedItem(t *testing.T
 	got, err := deps.itemRepo.GetByID(userA, item.ID)
 	require.NoError(t, err)
 	require.Nil(t, got, "the item must remain deleted after Bob's failed restore attempt")
+}
+
+func TestLearningItemService_DeletePermanently_HardDeletesWholeSubtree(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	parent, err := deps.items.Create(userA, services.CreateItemInput{Title: "Backend"})
+	require.NoError(t, err)
+	child, err := deps.items.Create(userA, services.CreateItemInput{Title: "Kafka", ParentID: &parent.ID})
+	require.NoError(t, err)
+
+	_, err = deps.items.Delete(userA, parent.ID)
+	require.NoError(t, err)
+
+	count, err := deps.items.DeletePermanently(userA, parent.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+
+	gotParent, err := deps.itemRepo.GetDeletedByID(userA, parent.ID)
+	require.NoError(t, err)
+	require.Nil(t, gotParent, "parent must be gone entirely, not just still soft-deleted")
+
+	gotChild, err := deps.itemRepo.GetDeletedByID(userA, child.ID)
+	require.NoError(t, err)
+	require.Nil(t, gotChild, "child must be gone too")
+}
+
+func TestLearningItemService_DeletePermanently_RejectsAnotherUsersItem(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+	userB := createUser("bob@example.com")
+
+	item, err := deps.items.Create(userA, services.CreateItemInput{Title: "Alice's item"})
+	require.NoError(t, err)
+	_, err = deps.items.Delete(userA, item.ID)
+	require.NoError(t, err)
+
+	_, err = deps.items.DeletePermanently(userB, item.ID)
+	require.Error(t, err, "Bob must not be able to purge Alice's deleted item")
+}
+
+func TestLearningItemService_EmptyTrash_HardDeletesEverythingDeleted(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	itemA, err := deps.items.Create(userA, services.CreateItemInput{Title: "Backend"})
+	require.NoError(t, err)
+	itemB, err := deps.items.Create(userA, services.CreateItemInput{Title: "Frontend"})
+	require.NoError(t, err)
+	kept, err := deps.items.Create(userA, services.CreateItemInput{Title: "Still active"})
+	require.NoError(t, err)
+
+	_, err = deps.items.Delete(userA, itemA.ID)
+	require.NoError(t, err)
+	_, err = deps.items.Delete(userA, itemB.ID)
+	require.NoError(t, err)
+
+	count, err := deps.items.EmptyTrash(userA)
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+
+	trash, err := deps.items.ListTrash(userA)
+	require.NoError(t, err)
+	require.Empty(t, trash, "trash must be empty after emptying it")
+
+	stillActive, err := deps.itemRepo.GetByID(userA, kept.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stillActive, "an item never deleted must be untouched by Empty Trash")
+}
+
+func TestLearningItemService_EmptyTrash_ScopedToOneUser(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+	userB := createUser("bob@example.com")
+
+	itemA, err := deps.items.Create(userA, services.CreateItemInput{Title: "Alice's item"})
+	require.NoError(t, err)
+	itemB, err := deps.items.Create(userB, services.CreateItemInput{Title: "Bob's item"})
+	require.NoError(t, err)
+	_, err = deps.items.Delete(userA, itemA.ID)
+	require.NoError(t, err)
+	_, err = deps.items.Delete(userB, itemB.ID)
+	require.NoError(t, err)
+
+	count, err := deps.items.EmptyTrash(userA)
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "must only purge Alice's own trash")
+
+	bobsTrash, err := deps.items.ListTrash(userB)
+	require.NoError(t, err)
+	require.Len(t, bobsTrash, 1, "Bob's trash must be untouched by Alice emptying hers")
+}
+
+func TestLearningItemService_ListTrash_PurgesItemsPastRetentionPeriod(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	recentlyDeleted, err := deps.items.Create(userA, services.CreateItemInput{Title: "Recently deleted"})
+	require.NoError(t, err)
+	longDeleted, err := deps.items.Create(userA, services.CreateItemInput{Title: "Deleted long ago"})
+	require.NoError(t, err)
+
+	_, err = deps.items.Delete(userA, recentlyDeleted.ID)
+	require.NoError(t, err)
+	_, err = deps.items.Delete(userA, longDeleted.ID)
+	require.NoError(t, err)
+
+	// Backdate one item's deleted_at past the retention window directly —
+	// there's no service-level way to do this (nor should there be), so the
+	// test reaches into the DB to simulate time having passed.
+	staleTime := time.Now().Add(-services.TrashRetentionPeriod - time.Hour)
+	require.NoError(t, deps.db.Unscoped().Model(&models.LearningItem{}).
+		Where("id = ?", longDeleted.ID).
+		Update("deleted_at", staleTime).Error)
+
+	trash, err := deps.items.ListTrash(userA)
+	require.NoError(t, err)
+	require.Len(t, trash, 1, "the expired item should be purged and gone from the list")
+	require.Equal(t, recentlyDeleted.ID, trash[0].ID)
+
+	gotStale, err := deps.itemRepo.GetDeletedByID(userA, longDeleted.ID)
+	require.NoError(t, err)
+	require.Nil(t, gotStale, "the expired item must be hard-deleted, not just hidden")
 }
 
 func TestLearningItemService_GetByID_ReturnsNilNotErrorForMissingOrForeignItem(t *testing.T) {

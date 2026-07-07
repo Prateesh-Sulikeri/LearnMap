@@ -145,8 +145,7 @@ export default function ProfilePage() {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Paste a link to an image already hosted somewhere (e.g. Gravatar), or upload a photo directly if you
-                don&apos;t have one anywhere — either way it's shown on your stat card above and in the sidebar.
+                Paste a link to a profile image already hosted somewhere (e.g. Gravatar), or upload a photo directly.
               </p>
               {profileForm.formState.errors.avatarUrl && (
                 <p className="text-sm text-destructive">{profileForm.formState.errors.avatarUrl.message}</p>

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Notes-system Todo pass, streak ranks, and focus mode (2026-07-07)
+- Added a streak rank system (7 fire-themed tiers keyed off `current_streak`): badge on the Profile stat card, an all-ranks reference dialog, rank shown in the sidebar.
+- Added focus mode for notes: fullscreen editing with a side tree of the whole topic, collapsible, defaulting to Preview. Renders via a `createPortal` straight onto `document.body` rather than through the Dialog primitive, after two CSS-based fullscreen attempts both proved unreliable in the browser.
+- Fixed: Save while in focus mode now persists without exiting/closing (previously it always closed the editor, which read as "Save doesn't work" in focus mode).
+- Added: mark-complete/reopen and "add sub-item" directly from the notes editor; Ctrl/Cmd+S; debounced auto-save (~2.5s idle); saving-on-close for any close path (Cancel, backdrop, Escape).
+- Added hierarchical "1"/"1a"/"1a1" numbering badges across every tree view (list, org-chart, focus-mode side tree), including a collapsed thin-rail view.
+- Added rich markdown: GFM tables/task-lists/strikethrough (`remark-gfm`), syntax-highlighted code blocks (`rehype-highlight`), image size presets (Small/Medium/Large/Original) via the standard markdown title-attribute slot — no raw HTML.
+- Added copy-code "Copied!" confirmation; hid the markdown-help hint outside Write mode.
+- Added trash "Empty Trash" and per-item permanent delete (both confirmed), plus an automatic 7-day retention sweep enforced lazily on read (no job scheduler in this project).
+- Added functional breadcrumbs: every segment but the current page is a real link; the Learning page's Active/Completed tab and search moved from local state into URL search params so they're linkable.
+- Added markdown export: a single note as a `.md` file, or a whole topic (root + descendants) as one combined `.md` "notebook" with a generated table of contents.
+- Deferred (explicitly, with the user's input): an interactive/WYSIWYG-editable preview, PDF/DOCX/.zip export, and raw-HTML/drag-handle image resizing — all three would have reversed earlier deliberate lightweight-scope decisions. Drag-and-drop reordering of tree items was deferred separately as its own, larger feature.
+
 ### Post-Milestone-3 UX/feature pass (2026-07-07)
 - Added a recycle bin: `GET /items/trash` and `POST /items/:id/restore` (mirrors Delete's cascade), a Trash page (`/trash`), and cache invalidation so deleting an item updates Trash without a manual refresh.
 - Added a top-down org-chart view of the Learning page (`OrgChartTree`), toggled per-user preference alongside the existing indented list — both fully editable. Added an Active/Completed tab split on top-level topics, and moved search from global `AppLayout` chrome to a page-local control (it was inert on every page but Learning).

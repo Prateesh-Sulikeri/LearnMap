@@ -1,5 +1,47 @@
 # LearnMap.app — Architecture Decision Records
 
+## ADR-026: Trash retention enforced lazily on read, not a scheduled job
+
+**Decision:** Deleted items are permanently purged 7 days after deletion, checked and enforced inside `ListTrash` itself (on every call) rather than by a background job or cron.
+
+**Context:** The design doc's Todo asked for automatic cleanup of trashed items after a week. This project has no job scheduler or background worker infrastructure at all.
+
+**Alternatives considered:** A real scheduled job (e.g. a goroutine ticker in `main.go`, or an external cron hitting a purge endpoint) — deferred as unnecessary infrastructure for a pilot-scale MVP with no such infrastructure anywhere else; a client-side timer — rejected, since purging must happen server-side regardless of whether any client is open.
+
+**Reasoning:** A user opening the Trash page is the one moment that matters for this feature (there's no other UI surface where trash age is user-visible), so enforcing the policy exactly there is sufficient and adds no new moving parts. The tradeoff — a user who never revisits Trash keeps expired items around harmlessly until they do — is acceptable at this scale and is called out explicitly as technical debt rather than hidden.
+
+**Status:** Approved and implemented (`backend/internal/services/learning_item_service.go`: `PurgeExpiredTrash`, called from `ListTrash`).
+
+---
+
+## ADR-025: Image sizing via the standard markdown title attribute, not raw HTML
+
+**Decision:** Note images can be sized (Small/Medium/Large/Original) by encoding the size into the image's standard CommonMark title slot — `![alt](url "size=medium")` — parsed back out by the preview's `img` component into a CSS class, never rendered as a literal `title` attribute.
+
+**Context:** Adjustable image sizes were requested. The two "real" ways to do this in markdown are either a custom, non-standard sizing syntax (needs a custom remark plugin) or embedding raw `<img width="...">` HTML directly. This project deliberately does not enable raw HTML in notes (`rehype-raw` is not installed) specifically to keep user-authored notes safe from script injection — re-enabling it just for image sizing would reopen that surface for a minor cosmetic feature.
+
+**Alternatives considered:** A custom remark plugin for non-standard sizing syntax — more powerful (true drag-handle resizing) but a materially bigger scope increase than the feature justified, and the user explicitly picked the lighter "simple preset buttons" option when asked. Enabling raw HTML with a sanitizer added back in — rejected for the same reason: disproportionate to the ask.
+
+**Reasoning:** The title attribute is valid, standard CommonMark — no parser changes needed, and it degrades gracefully (a viewer that doesn't understand the `size=` convention just shows a harmless literal title tooltip... except this app's own preview strips it before render specifically to avoid that). Zero new security surface, zero new dependency for the sizing itself.
+
+**Status:** Approved and implemented (`frontend/src/utils/markdownEditing.ts`: `setImageSize`; `frontend/src/components/notes/MarkdownPreview.tsx`).
+
+---
+
+## ADR-024: Focus mode renders through a portal, not the Dialog primitive
+
+**Decision:** Notes focus mode renders as a plain `fixed inset-0` div via `createPortal` straight onto `document.body`, completely bypassing Base UI's `Dialog`/`DialogContent` (Popup) component that the normal (non-focus) notes editor still uses.
+
+**Context:** Two earlier attempts to make focus mode genuinely fullscreen by overriding `DialogContent`'s own styling both failed in the actual browser: first a Tailwind class override (silently lost to a tailwind-merge "variant bucket" mismatch — `sm:max-w-sm` in the base classes lives in a different conflict-resolution group than an unprefixed override class), then an inline `style` object (should win on CSS specificity grounds alone, but still rendered constrained in practice — root cause not fully diagnosed without live devtools access).
+
+**Alternatives considered:** A third attempt at further overriding the Dialog primitive's own positioning — rejected after two failures at exactly that; digging into Base UI's internals with devtools — not available in this environment.
+
+**Reasoning:** Rather than continuing to fight a component's internal layout behavior a third time, sidestepping it entirely removes the whole class of failure: there's nothing left of Base UI's Dialog positioning for a portaled plain div to conflict with. `DialogHeader`/`DialogFooter` (confirmed, via reading their source, to be plain `<div>` wrappers with no Base UI Root/Context dependency) are still reused in both the portal and non-portal branches; `DialogTitle`/`DialogDescription` (which do wrap Base UI primitives requiring `Dialog` Root context) were replaced with plain `<p>` elements in the shared body so it renders correctly in both branches.
+
+**Status:** Approved and implemented (`frontend/src/components/notes/NotesEditorDialog.tsx`).
+
+---
+
 ## ADR-023: Dedicated test database, structurally enforced
 
 **Decision:** Backend tests run against a separate `learnmap_test` database in the same Postgres instance, never the `learnmap` database the dev/prod backend actually uses. `internal/testutil.TestDatabaseURL()` defaults to `learnmap_test`; both `SetupTestDB` and `TruncateAll` now hard-refuse (return an error) if the target database's name doesn't contain "test", regardless of what `TEST_DATABASE_URL` is set to.
