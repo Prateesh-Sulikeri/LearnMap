@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Circle,
   CircleCheck,
+  Clock,
   Download,
   Eye,
   ListTree,
@@ -36,6 +37,7 @@ import {
 import { MarkdownToolbar } from '@/components/notes/MarkdownToolbar'
 import { MarkdownPreview } from '@/components/notes/MarkdownPreview'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
+import { AddSessionDialog } from '@/components/AddSessionDialog'
 
 type EditorTab = 'write' | 'preview' | 'contents'
 
@@ -66,6 +68,7 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
   const [focusMode, setFocusMode] = useState(false)
   const [sideTreeCollapsed, setSideTreeCollapsed] = useState(false)
   const [addChildOpen, setAddChildOpen] = useState(false)
+  const [logSessionOpen, setLogSessionOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const queryClient = useQueryClient()
 
@@ -295,6 +298,10 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
                     <MoreHorizontal className="size-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setLogSessionOpen(true)} className="flex items-center gap-3">
+                      <Clock className="size-4" />
+                      Log a session
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setAddChildOpen(true)} className="flex items-center gap-3">
                       <Plus className="size-4" />
                       Add sub-item
@@ -380,9 +387,12 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
     </>
   )
 
-  // Rendered regardless of focus mode, so "Add sub-item" works from either.
-  const addChildDialog = node && (
-    <ItemFormDialog open={addChildOpen} onOpenChange={setAddChildOpen} mode="create" parentId={node.id} />
+  // Rendered regardless of focus mode, so these actions work from either.
+  const nodeScopedDialogs = node && (
+    <>
+      <ItemFormDialog open={addChildOpen} onOpenChange={setAddChildOpen} mode="create" parentId={node.id} />
+      <AddSessionDialog open={logSessionOpen} onOpenChange={setLogSessionOpen} defaultItemId={node.id} />
+    </>
   )
 
   if (focusMode) {
@@ -390,7 +400,7 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
     return createPortal(
       <>
         <div className="fixed inset-0 z-50 flex bg-popover text-popover-foreground">{body}</div>
-        {addChildDialog}
+        {nodeScopedDialogs}
       </>,
       document.body,
     )
@@ -403,7 +413,7 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
           {body}
         </DialogContent>
       </Dialog>
-      {addChildDialog}
+      {nodeScopedDialogs}
     </>
   )
 }

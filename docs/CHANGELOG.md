@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Session persistence, completion rule, and log-from-notes (2026-07-07)
+- Fixed: sessions could get logged out unexpectedly after some time despite refresh tokens existing. Root cause: refresh-token rotation revoked the previous token instantly, so two tabs/devices sharing one login (explicitly a design goal — ADR-010) whose access tokens happened to expire close together would race on `/auth/refresh`; the loser's request, carrying the now-superseded token, was rejected outright even though the session was never actually compromised. Fixed with a 30-second reuse grace window on rotation (ADR-031) — a well-established pattern (used by Supabase/GoTrue, among others) for exactly this race, without meaningfully weakening protection against a genuinely stolen token.
+- Added: an item can only be marked complete if it has no sub-items, or every sub-item is already complete — attempting otherwise is rejected with a clear message ("complete every sub-item before marking this one complete"). Reopening a sub-item (or adding a new, incomplete one) now cascades a reopen up through any ancestor that was completed, since "all children completed" is no longer true for it either — otherwise a completed parent could silently end up with an incomplete child.
+- Added: a "Log a session" action in the notes editor's "..." menu, alongside the existing "Add sub-item" — logging time no longer requires leaving the note to find the item in the tree first.
+
 ### Dashboard/Stats merge; Learning page favorites and layout rework (2026-07-07)
 - Removed: the dedicated Statistics page (`/stats`) and its nav entry. Its Weekly/Monthly/Yearly toggle and trend chart now live directly on the Dashboard, replacing the old fixed-to-last-7-days "Weekly hours" chart — one page doing the job of two.
 - Changed: any learning item can now be favorited, not just a top-level topic (`SetFavorite`'s root-only rejection removed, both backend and the frontend's star button). A favorited non-root item shows in the Favs tab as its own standalone entry — itself and its own descendants only, independent of its ancestors and siblings — instead of requiring a whole top-level topic. See ADR-030.

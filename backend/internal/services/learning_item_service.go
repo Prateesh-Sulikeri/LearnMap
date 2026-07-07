@@ -54,6 +54,14 @@ func (s *LearningItemService) Create(userID uuid.UUID, input CreateItemInput) (*
 
 	_ = s.events.Record(userID, models.EventTaskCreated, models.EntityLearningItem, item.ID, map[string]interface{}{"title": item.Title})
 
+	// A brand-new sub-item is never complete — if its parent was, "all
+	// children completed" is no longer true, so cascade the reopen upward.
+	if input.ParentID != nil {
+		if err := s.reopenAncestorChain(userID, input.ParentID); err != nil {
+			return nil, err
+		}
+	}
+
 	return item, nil
 }
 
@@ -117,6 +125,22 @@ func (s *LearningItemService) SetStatus(userID, itemID uuid.UUID, status models.
 	}
 
 	wasCompleted := item.Status == models.StatusCompleted
+
+	if status == models.StatusCompleted && !wasCompleted {
+		children, err := s.items.Children(userID, itemID)
+		if err != nil {
+			return nil, err
+		}
+		for _, child := range children {
+			if child.Status != models.StatusCompleted {
+				return nil, apperror.Validation(
+					"complete every sub-item before marking this one complete",
+					map[string]string{"status": "has incomplete sub-items"},
+				)
+			}
+		}
+	}
+
 	item.Status = status
 
 	var eventType models.EventType
@@ -137,7 +161,46 @@ func (s *LearningItemService) SetStatus(userID, itemID uuid.UUID, status models.
 	}
 	_ = s.events.Record(userID, eventType, models.EntityLearningItem, item.ID, map[string]interface{}{"status": string(status)})
 
+	// Reopening a child means "all children completed" is no longer true for
+	// its parent — cascade the reopen upward so a completed ancestor never
+	// silently becomes a lie.
+	if status != models.StatusCompleted && wasCompleted {
+		if err := s.reopenAncestorChain(userID, item.ParentID); err != nil {
+			return nil, err
+		}
+	}
+
 	return item, nil
+}
+
+// reopenAncestorChain walks up from parentID, reopening (to in_progress) any
+// ancestor currently marked completed. Stops at the first ancestor that
+// isn't completed, since a consistent tree can't have a completed node above
+// an incomplete one — if this parent isn't completed, nothing further up can
+// be either.
+func (s *LearningItemService) reopenAncestorChain(userID uuid.UUID, parentID *uuid.UUID) error {
+	for parentID != nil {
+		parent, err := s.items.GetByID(userID, *parentID)
+		if err != nil {
+			return err
+		}
+		if parent == nil || parent.Status != models.StatusCompleted {
+			return nil
+		}
+
+		parent.Status = models.StatusInProgress
+		parent.CompletedAt = nil
+		if err := s.items.Update(parent); err != nil {
+			return err
+		}
+		_ = s.events.Record(userID, models.EventTaskReopened, models.EntityLearningItem, parent.ID, map[string]interface{}{
+			"status": string(models.StatusInProgress),
+			"reason": "sub-item reopened",
+		})
+
+		parentID = parent.ParentID
+	}
+	return nil
 }
 
 // SetFavorite toggles whether itemID (and its whole subtree) shows up in the

@@ -89,6 +89,11 @@ Three items from the same Todo were explicitly scoped down or deferred after ask
 - A completed root topic now drops out of both Active and Favs (reachable only via Completed) — reversing the earlier "Active shows everything regardless of status" choice above; a favorited-and-completed topic isn't unfavorited, it just doesn't surface in Favs until reopened.
 - Learning page reorganized: added a page title (there wasn't one before), moved List/Map toggle + Trash link to a title row as page-level utility actions, grouped the tabs and search into their own row below it (previously two flex-wrap rows of assorted controls with no clear hierarchy). Tabs reordered to Favs/Active/Completed and Favs is now the default landing tab (was Active).
 
+**Session persistence, completion rule, log-from-notes (2026-07-07)**, direct follow-up feedback:
+- Fixed a real session-persistence bug: refresh-token rotation revoked the previous token instantly, so two tabs/devices sharing one login (an explicit ADR-010 design goal) could race on `/auth/refresh` when both access tokens happened to expire close together — the loser got logged out even though the session was never compromised. Fixed with a 30-second reuse grace window on rotation (ADR-031).
+- Added the completion rule: an item can only be marked complete once it has no sub-items, or every sub-item is already complete; rejected otherwise with a clear message. Reopening a sub-item (or adding a new incomplete one) now cascades a reopen up through any completed ancestor, so a completed parent can never silently end up with an incomplete child.
+- Added a "Log a session" action inside the notes editor's "..." menu (alongside "Add sub-item"), so logging time no longer requires leaving the note first.
+
 ## Next Milestone
 Milestone 6 — Deployment & Pilot Rollout: Dockerfiles + docker-compose, managed Postgres provisioning, persistent object storage for uploads (currently local-disk), production secrets/CORS, HTTPS, basic structured logging, pilot account distribution.
 

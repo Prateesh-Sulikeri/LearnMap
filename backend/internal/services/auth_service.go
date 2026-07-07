@@ -99,7 +99,11 @@ func (s *AuthService) Login(email, password string) (*AuthResult, error) {
 	return s.issueTokens(user)
 }
 
-// Refresh rotates a refresh token: the presented one is revoked and a fresh pair is issued.
+// Refresh rotates a refresh token: the presented one is revoked and a fresh
+// pair is issued. A token already revoked within RefreshTokenReuseGrace is
+// still accepted (see that constant's doc comment) but isn't re-revoked —
+// its revoked_at stays at the moment of its first use, so the grace window
+// expires on schedule rather than resetting on every reuse.
 func (s *AuthService) Refresh(rawRefreshToken string) (*AuthResult, error) {
 	if rawRefreshToken == "" {
 		return nil, apperror.Unauthorized("missing refresh token")
@@ -121,8 +125,10 @@ func (s *AuthService) Refresh(rawRefreshToken string) (*AuthResult, error) {
 		return nil, apperror.Unauthorized("invalid or expired refresh token")
 	}
 
-	if err := s.refreshTokens.Revoke(stored.ID); err != nil {
-		return nil, err
+	if stored.RevokedAt == nil {
+		if err := s.refreshTokens.Revoke(stored.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	return s.issueTokens(user)

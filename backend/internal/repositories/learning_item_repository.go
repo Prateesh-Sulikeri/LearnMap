@@ -51,6 +51,15 @@ func (r *LearningItemRepository) Update(item *models.LearningItem) error {
 	return r.db.Save(item).Error
 }
 
+// Children returns the direct (one level deep) children of parentID — used
+// to enforce that an item can only be marked complete once none of its own
+// children are left incomplete.
+func (r *LearningItemRepository) Children(userID, parentID uuid.UUID) ([]models.LearningItem, error) {
+	var items []models.LearningItem
+	err := r.db.Where("user_id = ? AND parent_id = ?", userID, parentID).Find(&items).Error
+	return items, err
+}
+
 // SoftDeleteWithSessions soft-deletes every item in itemIDs (already
 // validated by the caller to belong to userID) along with any study_sessions
 // referencing them, in one transaction.

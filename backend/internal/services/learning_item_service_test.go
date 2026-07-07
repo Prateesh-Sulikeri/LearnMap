@@ -75,6 +75,91 @@ func TestLearningItemService_SetStatus_CompletedThenReopened(t *testing.T) {
 	require.Nil(t, reopened.CompletedAt, "completed_at must clear when an item is reopened")
 }
 
+func TestLearningItemService_SetStatus_RejectsCompleteWithIncompleteChildren(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	parent, err := deps.items.Create(userA, services.CreateItemInput{Title: "Backend"})
+	require.NoError(t, err)
+	child, err := deps.items.Create(userA, services.CreateItemInput{Title: "Kafka", ParentID: &parent.ID})
+	require.NoError(t, err)
+
+	_, err = deps.items.SetStatus(userA, parent.ID, models.StatusCompleted)
+	require.Error(t, err, "a parent with an incomplete child must not be completable")
+
+	_, err = deps.items.SetStatus(userA, child.ID, models.StatusCompleted)
+	require.NoError(t, err)
+
+	completedParent, err := deps.items.SetStatus(userA, parent.ID, models.StatusCompleted)
+	require.NoError(t, err, "once every child is completed, the parent must be completable")
+	require.Equal(t, models.StatusCompleted, completedParent.Status)
+}
+
+func TestLearningItemService_SetStatus_AllowsCompleteWithNoChildren(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	leaf, err := deps.items.Create(userA, services.CreateItemInput{Title: "Kafka"})
+	require.NoError(t, err)
+
+	completed, err := deps.items.SetStatus(userA, leaf.ID, models.StatusCompleted)
+	require.NoError(t, err, "a leaf with no children must always be completable")
+	require.Equal(t, models.StatusCompleted, completed.Status)
+}
+
+func TestLearningItemService_SetStatus_ReopeningChildCascadesUpCompletedAncestors(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	grandparent, err := deps.items.Create(userA, services.CreateItemInput{Title: "Backend"})
+	require.NoError(t, err)
+	parent, err := deps.items.Create(userA, services.CreateItemInput{Title: "Distributed Systems", ParentID: &grandparent.ID})
+	require.NoError(t, err)
+	child, err := deps.items.Create(userA, services.CreateItemInput{Title: "Consensus Algorithms", ParentID: &parent.ID})
+	require.NoError(t, err)
+
+	_, err = deps.items.SetStatus(userA, child.ID, models.StatusCompleted)
+	require.NoError(t, err)
+	_, err = deps.items.SetStatus(userA, parent.ID, models.StatusCompleted)
+	require.NoError(t, err)
+	_, err = deps.items.SetStatus(userA, grandparent.ID, models.StatusCompleted)
+	require.NoError(t, err)
+
+	// Reopening the leaf must cascade the reopen all the way up — a
+	// completed grandparent implied every descendant was complete, which is
+	// no longer true.
+	_, err = deps.items.SetStatus(userA, child.ID, models.StatusInProgress)
+	require.NoError(t, err)
+
+	reloadedParent, err := deps.itemRepo.GetByID(userA, parent.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.StatusInProgress, reloadedParent.Status, "parent must be auto-reopened")
+	require.Nil(t, reloadedParent.CompletedAt)
+
+	reloadedGrandparent, err := deps.itemRepo.GetByID(userA, grandparent.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.StatusInProgress, reloadedGrandparent.Status, "grandparent must be auto-reopened too")
+	require.Nil(t, reloadedGrandparent.CompletedAt)
+}
+
+func TestLearningItemService_Create_ReopensCompletedParentWhenNewChildAdded(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	parent, err := deps.items.Create(userA, services.CreateItemInput{Title: "Backend"})
+	require.NoError(t, err)
+	_, err = deps.items.SetStatus(userA, parent.ID, models.StatusCompleted)
+	require.NoError(t, err, "a leaf with no children must be completable")
+
+	_, err = deps.items.Create(userA, services.CreateItemInput{Title: "Kafka", ParentID: &parent.ID})
+	require.NoError(t, err)
+
+	reloadedParent, err := deps.itemRepo.GetByID(userA, parent.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.StatusInProgress, reloadedParent.Status, "adding an incomplete child must reopen a completed parent")
+	require.Nil(t, reloadedParent.CompletedAt)
+}
+
 func TestLearningItemService_SetStatus_RejectsInvalidValue(t *testing.T) {
 	deps, createUser := setupItemService(t)
 	userA := createUser("alice@example.com")

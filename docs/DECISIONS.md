@@ -1,5 +1,19 @@
 # LearnMap.app — Architecture Decision Records
 
+## ADR-031: 30-second grace window on refresh token rotation reuse
+
+**Decision:** A refresh token rotated (superseded) by a `/auth/refresh` call remains usable for `RefreshTokenReuseGrace` (30 seconds) after that rotation, rather than being instantly and permanently rejected. Reuse within the window succeeds and mints a fresh access/refresh pair, same as normal; reuse after the window is rejected exactly as before. The rotated token's `revoked_at` is set once, at first use, and not bumped forward by grace-window reuse — so the window has a fixed expiry from the original rotation rather than being extendable forever.
+
+**Context:** Direct bug report: sessions were getting logged out "after some time" despite refresh tokens existing. Root cause: the access token lives in per-tab/per-device memory (ADR-010), each with its own independent expiry, but they all share one refresh cookie. Two tabs (or a phone and a laptop, ADR-010's explicit multi-device goal) whose access tokens happen to expire close together each fire `/auth/refresh` around the same time using the same cookie value. The first to land rotates the token; the second — already in flight, carrying the value that just got superseded — was rejected outright under strict single-use rotation, logging out a session that was never actually compromised.
+
+**Alternatives considered:** No rotation at all (refresh token stays valid until its own 30-day expiry) — simpler, but gives up rotation's real benefit (a leaked token becoming useless as soon as the legitimate owner's next refresh happens). Token-family/chain reuse-detection (treat any reuse as theft, revoke the whole chain) — the stronger OWASP-recommended defense, but actively wrong here: it would treat the legitimate multi-tab race as an attack and kill every session, the opposite of the goal. A reuse *interval* (used by Supabase/GoTrue and other production auth systems for this exact scenario) directly targets the race without weakening the single-use property beyond a short, bounded window.
+
+**Reasoning:** 30 seconds is generous enough to absorb realistic race timing (network latency plus near-simultaneous expiry) while keeping the exposure window for a genuinely stolen token small — materially the same security posture as before for anyone actually trying to replay a leaked token more than 30 seconds after its legitimate rotation.
+
+**Status:** Approved and implemented (`RefreshTokenReuseGrace` in `refresh_token_repository.go`; `AuthService.Refresh`'s conditional revoke).
+
+---
+
 ## ADR-030: Any item can be favorited; a favorited non-root item displays as its own pruned subtree
 
 **Decision:** `SetFavorite` no longer rejects non-root items — any learning item, at any depth, can be favorited. The Favs tab collects every favorited node in the tree (via `collectFavoriteRoots`, a top-down walk that stops descending once it finds a favorited node) and displays each as its own independent entry: itself plus its own descendants, with its real ancestors and siblings excluded entirely. Favoriting a node with children no longer requires it to be a root topic. Separately, a completed root topic now drops out of both Active and Favs (still reachable in Completed) — reversing this project's own earlier choice to show every root in Active regardless of status.
@@ -250,7 +264,7 @@
 
 **Reasoning:** This hybrid is the standard, well-understood pattern for browser-based multi-device auth: XSS can't steal the httpOnly refresh cookie, and a stolen short-lived access token has a small blast-radius window. Requires HTTPS in production (cookies must be `Secure`) — already a requirement for a hosted app.
 
-**Status:** Proposed (pending approval).
+**Status:** Approved and implemented (`AuthService`, `AuthHandler`, `refresh_tokens` table). See also ADR-031, which patches a rotation-related race this design didn't originally account for.
 
 ---
 
