@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { DailyHoursPoint } from '@/types/api'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -82,6 +83,18 @@ interface ContributionHeatmapProps {
 export function ContributionHeatmap({ data }: ContributionHeatmapProps) {
   const weeks = buildWeeks(data)
   const activeDays = data.filter((d) => d.hours > 0).length
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // The grid renders oldest-week-first (left) so month labels read correctly,
+  // but that means the browser's default scroll position (scrollLeft: 0)
+  // shows the OLDEST months, not the current one — scroll to the end on
+  // mount and whenever the data changes (it arrives async, after the
+  // container's already rendered) so the latest activity is what's visible
+  // by default, matching GitHub's own heatmap.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  }, [weeks.length])
 
   if (weeks.length === 0) {
     return <p className="text-sm text-muted-foreground">No study sessions logged yet.</p>
@@ -89,7 +102,7 @@ export function ContributionHeatmap({ data }: ContributionHeatmapProps) {
 
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto pb-1">
+      <div ref={scrollRef} className="overflow-x-auto pb-1">
         <div className="flex w-max gap-[3px]">
           {weeks.map((week, i) => (
             <div key={i} className="flex flex-col gap-[3px]">
