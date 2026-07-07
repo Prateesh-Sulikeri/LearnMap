@@ -7,6 +7,7 @@ import RegisterPage from '@/pages/RegisterPage'
 import DashboardPage from '@/pages/DashboardPage'
 import LearningTreePage from '@/pages/LearningTreePage'
 import StudySessionsPage from '@/pages/StudySessionsPage'
+import StatisticsPage from '@/pages/StatisticsPage'
 import ProfilePage from '@/pages/ProfilePage'
 import TrashPage from '@/pages/TrashPage'
 import PublicProfilePage from '@/pages/PublicProfilePage'
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/tree" element={<LearningTreePage />} />
           <Route path="/sessions" element={<StudySessionsPage />} />
+          <Route path="/stats" element={<StatisticsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/trash" element={<TrashPage />} />
         </Route>

@@ -4,18 +4,25 @@ import { dashboardApi } from '@/services/dashboardApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatCard } from '@/components/StatCard'
+import { WeeklyHoursChart } from '@/components/charts/WeeklyHoursChart'
+import { TopTopicsChart } from '@/components/charts/TopTopicsChart'
+import { CompletionMeter } from '@/components/charts/CompletionMeter'
 
-// Weekly-hours/top-topics *charts* are Milestone 4's job (Recharts); this
-// renders the same underlying dashboard data as plain stat cards + lists.
 export default function DashboardPage() {
   const { data, isLoading, isError } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 w-full" />
-        ))}
+      <div className="space-y-6">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-64 w-full md:col-span-2" />
+          <Skeleton className="h-64 w-full" />
+        </div>
       </div>
     )
   }
@@ -26,11 +33,35 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      {/* auto-fit/minmax, not grid-cols-4 — a fixed 4-column grid truncated
+          every label to a single letter around the tablet breakpoint (the
+          sidebar eats into the available width before md:grid-cols-4 accounts
+          for it). Same fix as ProfilePage's stat-tile row. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
         <StatCard label="Study hours this week" value={data.study_hours_this_week.toFixed(1)} icon={CalendarClock} />
         <StatCard label="Current streak" value={`${data.current_streak}d`} icon={Flame} />
         <StatCard label="Completed" value={String(data.completed_items)} icon={CheckCircle2} />
         <StatCard label="Pending" value={String(data.pending_items)} icon={ListTodo} />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="font-heading text-base">Weekly hours</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <WeeklyHoursChart data={data.weekly_hours_chart} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading text-base">Completion</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CompletionMeter percentage={data.completion_percentage} />
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -39,18 +70,7 @@ export default function DashboardPage() {
             <CardTitle className="font-heading text-base">Top topics</CardTitle>
           </CardHeader>
           <CardContent>
-            {data.top_topics.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Log a session to see your top topics here.</p>
-            ) : (
-              <ul className="space-y-2">
-                {data.top_topics.map((topic) => (
-                  <li key={topic.learning_item_id} className="flex items-center justify-between text-sm">
-                    <span className="truncate">{topic.title}</span>
-                    <span className="font-mono text-muted-foreground">{topic.hours.toFixed(1)}h</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <TopTopicsChart data={data.top_topics} />
           </CardContent>
         </Card>
 

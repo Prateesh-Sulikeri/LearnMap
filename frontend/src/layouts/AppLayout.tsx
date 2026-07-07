@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
+  BarChart3,
   CalendarClock,
   LayoutDashboard,
   ListTree,
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/tree', label: 'Learning', icon: ListTree },
   { to: '/sessions', label: 'Sessions', icon: CalendarClock },
+  { to: '/stats', label: 'Stats', icon: BarChart3 },
   { to: '/profile', label: 'Profile', icon: UserRound },
 ] as const
 
@@ -32,6 +34,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/tree': 'Learning',
   '/sessions': 'Study Sessions',
+  '/stats': 'Statistics',
   '/profile': 'Profile',
   '/trash': 'Trash',
 }
@@ -64,6 +67,13 @@ function getBreadcrumbs(pathname: string, search: string): Crumb[] {
 
   if (pathname === '/trash') {
     return [home, { label: 'Learning', to: '/tree' }, { label: 'Trash' }]
+  }
+
+  if (pathname === '/stats') {
+    const rangeParam = params.get('range')
+    const range = rangeParam === 'month' ? 'month' : rangeParam === 'year' ? 'year' : 'week'
+    const rangeLabel = range === 'month' ? 'Monthly' : range === 'year' ? 'Yearly' : 'Weekly'
+    return [home, { label: 'Statistics', to: '/stats' }, { label: rangeLabel }]
   }
 
   return [home, { label: PAGE_TITLES[pathname] ?? 'LearnMap' }]
