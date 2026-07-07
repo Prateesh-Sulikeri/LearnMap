@@ -6,6 +6,7 @@ import type { Dashboard, User } from '@/types/api'
 import { resolveAssetUrl } from '@/utils/url'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { StreakRankBadge } from '@/components/profile/StreakRankBadge'
 
 interface ProfileStatCardProps {
   user: User
@@ -58,6 +59,8 @@ export function ProfileStatCard({ user, dashboard }: ProfileStatCardProps) {
             <p className="font-heading text-lg font-semibold">{user.display_name}</p>
             <p className="text-xs text-muted-foreground">learnmap.app</p>
           </div>
+
+          <StreakRankBadge streakDays={dashboard?.current_streak ?? 0} size="lg" showProgress />
 
           <div className="grid w-full grid-cols-2 gap-3">
             <div className="rounded-xl bg-card px-3 py-4 ring-1 ring-foreground/10">
