@@ -24,12 +24,12 @@ func NewStudySessionHandler(service *services.StudySessionService) *StudySession
 }
 
 type createSessionRequest struct {
-	LearningItemID string   `json:"learning_item_id" binding:"required"`
-	Hours          *float64 `json:"hours"`
-	Notes          *string  `json:"notes"`
-	SessionDate    *string  `json:"session_date"`
-	ScheduledStart *string  `json:"scheduled_start"`
-	ScheduledEnd   *string  `json:"scheduled_end"`
+	LearningItemIDs []string `json:"learning_item_ids" binding:"required,min=1"`
+	Hours           *float64 `json:"hours"`
+	Notes           *string  `json:"notes"`
+	SessionDate     *string  `json:"session_date"`
+	ScheduledStart  *string  `json:"scheduled_start"`
+	ScheduledEnd    *string  `json:"scheduled_end"`
 }
 
 type confirmSessionRequest struct {
@@ -38,15 +38,16 @@ type confirmSessionRequest struct {
 }
 
 type sessionResponse struct {
-	ID             string  `json:"id"`
-	LearningItemID string  `json:"learning_item_id"`
-	Hours          float64 `json:"hours"`
-	Notes          *string `json:"notes"`
-	SessionDate    string  `json:"session_date"`
-	ScheduledStart *string `json:"scheduled_start"`
-	ScheduledEnd   *string `json:"scheduled_end"`
-	ConfirmedAt    *string `json:"confirmed_at"`
-	CreatedAt      string  `json:"created_at"`
+	ID              string   `json:"id"`
+	LearningItemID  string   `json:"learning_item_id"`
+	LearningItemIDs []string `json:"learning_item_ids"`
+	Hours           float64  `json:"hours"`
+	Notes           *string  `json:"notes"`
+	SessionDate     string   `json:"session_date"`
+	ScheduledStart  *string  `json:"scheduled_start"`
+	ScheduledEnd    *string  `json:"scheduled_end"`
+	ConfirmedAt     *string  `json:"confirmed_at"`
+	CreatedAt       string   `json:"created_at"`
 }
 
 func toSessionResponse(s *models.StudySession) sessionResponse {
@@ -63,16 +64,25 @@ func toSessionResponse(s *models.StudySession) sessionResponse {
 		val := s.ConfirmedAt.Format(time.RFC3339)
 		confirmedAt = &val
 	}
+	topicIDs := s.TopicIDs
+	if len(topicIDs) == 0 {
+		topicIDs = []uuid.UUID{s.LearningItemID}
+	}
+	learningItemIDs := make([]string, len(topicIDs))
+	for i, id := range topicIDs {
+		learningItemIDs[i] = id.String()
+	}
 	return sessionResponse{
-		ID:             s.ID.String(),
-		LearningItemID: s.LearningItemID.String(),
-		Hours:          s.Hours,
-		Notes:          s.Notes,
-		SessionDate:    s.SessionDate.Format("2006-01-02"),
-		ScheduledStart: scheduledStart,
-		ScheduledEnd:   scheduledEnd,
-		ConfirmedAt:    confirmedAt,
-		CreatedAt:      s.CreatedAt.Format(time.RFC3339),
+		ID:              s.ID.String(),
+		LearningItemID:  s.LearningItemID.String(),
+		LearningItemIDs: learningItemIDs,
+		Hours:           s.Hours,
+		Notes:           s.Notes,
+		SessionDate:     s.SessionDate.Format("2006-01-02"),
+		ScheduledStart:  scheduledStart,
+		ScheduledEnd:    scheduledEnd,
+		ConfirmedAt:     confirmedAt,
+		CreatedAt:       s.CreatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -136,10 +146,14 @@ func (h *StudySessionHandler) Create(c *gin.Context) {
 		return
 	}
 
-	itemID, err := uuid.Parse(req.LearningItemID)
-	if err != nil {
-		RespondValidationError(c, errors.New("learning_item_id must be a valid UUID"))
-		return
+	itemIDs := make([]uuid.UUID, len(req.LearningItemIDs))
+	for i, idStr := range req.LearningItemIDs {
+		parsed, err := uuid.Parse(idStr)
+		if err != nil {
+			RespondValidationError(c, errors.New("learning_item_ids must all be valid UUIDs"))
+			return
+		}
+		itemIDs[i] = parsed
 	}
 
 	// Two distinct flows share this endpoint, distinguished by session_date:
@@ -166,9 +180,9 @@ func (h *StudySessionHandler) Create(c *gin.Context) {
 		}
 
 		session, svcErr := h.service.CreateScheduled(userID, services.CreateScheduledSessionInput{
-			LearningItemID: itemID,
-			ScheduledStart: scheduledStart,
-			ScheduledEnd:   scheduledEnd,
+			LearningItemIDs: itemIDs,
+			ScheduledStart:  scheduledStart,
+			ScheduledEnd:    scheduledEnd,
 		})
 		if svcErr != nil {
 			RespondError(c, svcErr)
@@ -212,12 +226,12 @@ func (h *StudySessionHandler) Create(c *gin.Context) {
 	}
 
 	session, svcErr := h.service.Create(userID, services.CreateSessionInput{
-		LearningItemID: itemID,
-		Hours:          hours,
-		Notes:          req.Notes,
-		SessionDate:    sessionDate,
-		ScheduledStart: scheduledStart,
-		ScheduledEnd:   scheduledEnd,
+		LearningItemIDs: itemIDs,
+		Hours:           hours,
+		Notes:           req.Notes,
+		SessionDate:     sessionDate,
+		ScheduledStart:  scheduledStart,
+		ScheduledEnd:    scheduledEnd,
 	})
 	if svcErr != nil {
 		RespondError(c, svcErr)

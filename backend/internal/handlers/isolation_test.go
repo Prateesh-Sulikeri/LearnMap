@@ -47,7 +47,7 @@ func createItem(t *testing.T, router *gin.Engine, token, title string) string {
 
 func createSession(t *testing.T, router *gin.Engine, token, itemID string) string {
 	t.Helper()
-	body := fmt.Sprintf(`{"learning_item_id":%q,"hours":1.5,"session_date":"2026-07-06"}`, itemID)
+	body := fmt.Sprintf(`{"learning_item_ids":[%q],"hours":1.5,"session_date":"2026-07-06"}`, itemID)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/sessions", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)

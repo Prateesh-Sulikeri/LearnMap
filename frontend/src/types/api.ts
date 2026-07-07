@@ -93,7 +93,10 @@ export interface RestoreItemResponse {
 
 export interface StudySession {
   id: string
+  /** Primary/first topic — kept for back-compat, prefer learning_item_ids. */
   learning_item_id: string
+  /** Every topic this session covers (a session may span more than one). */
+  learning_item_ids: string[]
   hours: number
   notes: string | null
   session_date: string
@@ -104,7 +107,7 @@ export interface StudySession {
 }
 
 export interface CreateSessionRequest {
-  learning_item_id: string
+  learning_item_ids: string[]
   hours?: number
   notes?: string
   session_date?: string

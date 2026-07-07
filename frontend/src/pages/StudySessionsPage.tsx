@@ -15,6 +15,7 @@ import { DeleteSessionDialog } from '@/components/DeleteSessionDialog'
 import { SessionDetailsDialog } from '@/components/SessionDetailsDialog'
 import ShadcnBigCalendar from '@/components/shadcn-big-calendar/shadcn-big-calendar'
 import type { StudySession } from '@/types/api'
+import { getSessionStatus } from '@/utils/sessionStatus'
 
 const localizer = momentLocalizer(moment)
 
@@ -43,6 +44,12 @@ export default function StudySessionsPage() {
 
   const titleByItemId = new Map(items.map((item) => [item.id, item.title]))
 
+  // Get comma-joined topic titles for a session (may span more than one).
+  const getTopicTitles = (session: StudySession) => {
+    const ids = session.learning_item_ids.length > 0 ? session.learning_item_ids : [session.learning_item_id]
+    return ids.map((id) => titleByItemId.get(id) ?? 'Unknown').join(', ')
+  }
+
   const calendarEvents = (sessions ?? []).map((session) => {
     // Prefer real time-of-day when available (logged-with-times or scheduled
     // sessions); fall back to midnight + hours for old-style hours-only logs.
@@ -52,7 +59,7 @@ export default function StudySessionsPage() {
       : new Date(start.getTime() + session.hours * 60 * 60 * 1000)
     return {
       id: session.id,
-      title: `${titleByItemId.get(session.learning_item_id) ?? 'Unknown'} (${session.hours}h)`,
+      title: `${getTopicTitles(session)} (${session.hours}h)`,
       start,
       end,
       resource: session,
@@ -69,11 +76,6 @@ export default function StudySessionsPage() {
         )
       })
     : []
-
-  // Get topic title for session details
-  const getTopicTitle = (session: StudySession) => {
-    return titleByItemId.get(session.learning_item_id) || 'Unknown Topic'
-  }
 
   return (
     <div className="space-y-4">
@@ -137,9 +139,8 @@ export default function StudySessionsPage() {
             ) : (
               <div className="space-y-3">
                 {sessionsForSelectedDay.map((session) => {
-                  const isPending = session.scheduled_end && !session.confirmed_at
-                  const isExpired = isPending && new Date() > new Date(session.scheduled_end!)
-                  const topicTitle = getTopicTitle(session)
+                  const status = getSessionStatus(session)
+                  const topicTitles = getTopicTitles(session)
 
                   return (
                     <button
@@ -147,7 +148,7 @@ export default function StudySessionsPage() {
                       onClick={() => setDetailsSession(session)}
                       className="w-full text-left rounded-lg border border-border bg-card p-3 hover:bg-muted transition-colors"
                     >
-                      <p className="font-semibold text-sm">{topicTitle}</p>
+                      <p className="font-semibold text-sm">{topicTitles}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {session.hours > 0 ? `${session.hours}h` : ''}
                         {session.scheduled_start ? (
@@ -165,11 +166,14 @@ export default function StudySessionsPage() {
                           </>
                         ) : null}
                       </p>
-                      {isExpired && (
+                      {status === 'expired' && (
                         <p className="text-xs text-destructive font-semibold mt-1">Not confirmed</p>
                       )}
-                      {isPending && !isExpired && (
-                        <p className="text-xs text-warning font-semibold mt-1">Pending</p>
+                      {status === 'in_progress' && (
+                        <p className="text-xs text-warning font-semibold mt-1">In progress</p>
+                      )}
+                      {status === 'upcoming' && (
+                        <p className="text-xs text-muted-foreground font-semibold mt-1">Upcoming</p>
                       )}
                       {session.notes && (
                         <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{session.notes}</p>
@@ -198,7 +202,7 @@ export default function StudySessionsPage() {
       <ConfirmSessionDialog session={confirmSession} open={confirmSession !== null} onOpenChange={(open) => !open && setConfirmSession(null)} />
       <SessionDetailsDialog
         session={detailsSession}
-        topicTitle={detailsSession ? getTopicTitle(detailsSession) : undefined}
+        topicTitle={detailsSession ? getTopicTitles(detailsSession) : undefined}
         open={detailsSession !== null}
         onOpenChange={(open) => !open && setDetailsSession(null)}
         onConfirmClick={() => {

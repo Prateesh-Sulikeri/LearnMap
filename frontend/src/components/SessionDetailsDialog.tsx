@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { sessionsApi } from '@/services/sessionsApi'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { canConfirmSession, getSessionStatus } from '@/utils/sessionStatus'
 import type { StudySession } from '@/types/api'
 import {
   Dialog,
@@ -46,8 +47,8 @@ export function SessionDetailsDialog({
   const sessionDate = new Date(session.session_date)
   const startTime = session.scheduled_start ? new Date(session.scheduled_start) : null
   const endTime = session.scheduled_end ? new Date(session.scheduled_end) : null
-  const isPending = Boolean(session.scheduled_end) && !session.confirmed_at
-  const isExpired = isPending && new Date() > endTime!
+  const status = getSessionStatus(session)
+  const canConfirm = canConfirmSession(session)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,27 +61,32 @@ export function SessionDetailsDialog({
         <div className="space-y-4">
           {/* Time/Date Information */}
           <div className="space-y-2 rounded-lg bg-muted p-3">
-            {isPending ? (
+            {status !== 'logged' && startTime && endTime ? (
               <>
                 <p className="text-xs font-semibold text-muted-foreground">SCHEDULED</p>
                 <p className="text-sm">
-                  {startTime!.toLocaleString('en-US', {
+                  {startTime.toLocaleString('en-US', {
                     month: 'short',
                     day: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
                   {' — '}
-                  {endTime!.toLocaleTimeString('en-US', {
+                  {endTime.toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
                 </p>
-                {isExpired && (
-                  <p className="text-xs text-destructive font-semibold">EXPIRED - Not confirmed</p>
+                {status === 'upcoming' && (
+                  <p className="text-xs text-muted-foreground font-semibold">
+                    UPCOMING — starts {startTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 )}
-                {!isExpired && (
-                  <p className="text-xs text-warning font-semibold">PENDING - Awaiting confirmation</p>
+                {status === 'in_progress' && (
+                  <p className="text-xs text-warning font-semibold">IN PROGRESS — awaiting confirmation</p>
+                )}
+                {status === 'expired' && (
+                  <p className="text-xs text-destructive font-semibold">EXPIRED — not confirmed</p>
                 )}
               </>
             ) : startTime && endTime ? (
@@ -139,7 +145,7 @@ export function SessionDetailsDialog({
         </div>
 
         <DialogFooter className="flex gap-2">
-          {isPending && (
+          {canConfirm && (
             <Button variant="default" onClick={() => {
               onOpenChange(false)
               onConfirmClick?.()

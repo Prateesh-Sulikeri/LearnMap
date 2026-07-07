@@ -43,9 +43,11 @@ func (r *StudySessionRepository) GetByID(userID, sessionID uuid.UUID) (*models.S
 }
 
 func (r *StudySessionRepository) List(userID uuid.UUID, filter SessionFilter) ([]models.StudySession, error) {
-	query := r.db.Where("user_id = ?", userID)
+	query := r.db.Model(&models.StudySession{}).Where("study_sessions.user_id = ?", userID)
 	if filter.LearningItemID != nil {
-		query = query.Where("learning_item_id = ?", *filter.LearningItemID)
+		// Matches any topic the session covers, not just its primary — a
+		// session tagged with this topic as a secondary one should still show.
+		query = query.Where("EXISTS (SELECT 1 FROM study_session_topics sst WHERE sst.study_session_id = study_sessions.id AND sst.learning_item_id = ?)", *filter.LearningItemID)
 	}
 	if filter.From != nil {
 		query = query.Where("session_date >= ?", *filter.From)
@@ -73,6 +75,34 @@ func (r *StudySessionRepository) Update(session *models.StudySession) error {
 
 func (r *StudySessionRepository) Delete(userID, sessionID uuid.UUID) error {
 	return r.db.Where("id = ? AND user_id = ?", sessionID, userID).Delete(&models.StudySession{}).Error
+}
+
+// AddTopics records the full set of topics a session covers (including its
+// primary/first, so study_session_topics stays authoritative for every
+// session, not just multi-topic ones).
+func (r *StudySessionRepository) AddTopics(sessionID uuid.UUID, topicIDs []uuid.UUID) error {
+	rows := make([]models.StudySessionTopic, len(topicIDs))
+	for i, id := range topicIDs {
+		rows[i] = models.StudySessionTopic{StudySessionID: sessionID, LearningItemID: id}
+	}
+	return r.db.Create(&rows).Error
+}
+
+// TopicIDsForSessions batch-fetches every session's topic set in one query,
+// avoiding an N+1 when enriching a list of sessions.
+func (r *StudySessionRepository) TopicIDsForSessions(sessionIDs []uuid.UUID) (map[uuid.UUID][]uuid.UUID, error) {
+	result := make(map[uuid.UUID][]uuid.UUID, len(sessionIDs))
+	if len(sessionIDs) == 0 {
+		return result, nil
+	}
+	var rows []models.StudySessionTopic
+	if err := r.db.Where("study_session_id IN ?", sessionIDs).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.StudySessionID] = append(result[row.StudySessionID], row.LearningItemID)
+	}
+	return result, nil
 }
 
 // SumHoursSince returns total logged hours for userID with session_date >= since.
@@ -118,13 +148,19 @@ type TopicHours struct {
 	Hours          float64
 }
 
+// TopTopics attributes each session's full hours to every topic it covers
+// (via study_session_topics), not just its primary — a 2-hour session
+// spanning two topics counts as 2 hours toward each, not 1 each. This is a
+// deliberate simplification (no splitting) consistent with how a session
+// covering multiple topics is presented everywhere else.
 func (r *StudySessionRepository) TopTopics(userID uuid.UUID, limit int) ([]TopicHours, error) {
 	var rows []TopicHours
-	err := r.db.Table("study_sessions").
-		Select("study_sessions.learning_item_id as learning_item_id, learning_items.title as title, SUM(study_sessions.hours) as hours").
-		Joins("JOIN learning_items ON learning_items.id = study_sessions.learning_item_id").
+	err := r.db.Table("study_session_topics").
+		Select("study_session_topics.learning_item_id as learning_item_id, learning_items.title as title, SUM(study_sessions.hours) as hours").
+		Joins("JOIN study_sessions ON study_sessions.id = study_session_topics.study_session_id").
+		Joins("JOIN learning_items ON learning_items.id = study_session_topics.learning_item_id").
 		Where("study_sessions.user_id = ? AND study_sessions.deleted_at IS NULL", userID).
-		Group("study_sessions.learning_item_id, learning_items.title").
+		Group("study_session_topics.learning_item_id, learning_items.title").
 		Order("hours desc").
 		Limit(limit).
 		Scan(&rows).Error

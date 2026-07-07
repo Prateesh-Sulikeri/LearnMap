@@ -19,11 +19,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TopicMultiSelect } from '@/components/TopicMultiSelect'
 
 const sessionFormSchema = z
   .object({
-    learningItemId: z.string().min(1, 'Pick a topic'),
+    learningItemIds: z.array(z.string()).min(1, 'Pick at least one topic'),
     sessionStart: z.string().min(1, 'Pick a start time'),
     sessionEnd: z.string().min(1, 'Pick an end time'),
     notes: z.string().optional(),
@@ -78,7 +78,7 @@ export function AddSessionDialog({ open, onOpenChange, defaultItemId }: AddSessi
       const end = new Date()
       const start = new Date(end.getTime() - 60 * 60 * 1000)
       reset({
-        learningItemId: defaultItemId ?? '',
+        learningItemIds: defaultItemId ? [defaultItemId] : [],
         sessionStart: formatDateTimeLocal(start),
         sessionEnd: formatDateTimeLocal(end),
         notes: '',
@@ -98,7 +98,7 @@ export function AddSessionDialog({ open, onOpenChange, defaultItemId }: AddSessi
       const start = new Date(values.sessionStart)
       const end = new Date(values.sessionEnd)
       return sessionsApi.create({
-        learning_item_id: values.learningItemId,
+        learning_item_ids: values.learningItemIds,
         session_date: formatDateTimeLocal(start).slice(0, 10),
         scheduled_start: start.toISOString(),
         scheduled_end: end.toISOString(),
@@ -124,26 +124,20 @@ export function AddSessionDialog({ open, onOpenChange, defaultItemId }: AddSessi
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="session-topic">Topic</Label>
+            <Label htmlFor="session-topics">Topics</Label>
             <Controller
               control={control}
-              name="learningItemId"
+              name="learningItemIds"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="session-topic" className="w-full">
-                    <SelectValue placeholder="Choose what you studied" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {items.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <TopicMultiSelect
+                  id="session-topics"
+                  items={items}
+                  selectedIds={field.value ?? []}
+                  onChange={field.onChange}
+                />
               )}
             />
-            {errors.learningItemId && <p className="text-sm text-destructive">{errors.learningItemId.message}</p>}
+            {errors.learningItemIds && <p className="text-sm text-destructive">{errors.learningItemIds.message}</p>}
             {items.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 Add something to your learning map first before logging a session against it.

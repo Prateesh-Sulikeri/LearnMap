@@ -18,27 +18,28 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TopicMultiSelect } from '@/components/TopicMultiSelect'
 
-const scheduleFormSchema = z.object({
-  learningItemId: z.string().min(1, 'Pick a topic'),
-  scheduledStart: z.string().min(1, 'Pick a start time'),
-  scheduledEnd: z.string().min(1, 'Pick an end time'),
-}).refine(
-  (data) => {
-    const start = new Date(data.scheduledStart)
-    const end = new Date(data.scheduledEnd)
-    return start < end
-  },
-  { message: 'End time must be after start time', path: ['scheduledEnd'] }
-).refine(
-  (data) => {
-    const start = new Date(data.scheduledStart)
-    const now = new Date()
-    return start > now
-  },
-  { message: 'Cannot schedule sessions in the past', path: ['scheduledStart'] }
-)
+// Mirrors the backend's scheduleGraceWindow (study_session_service.go) —
+// "start right now" must be accepted even though, by the time the request
+// lands, the instant the user picked is technically already a few seconds
+// or minutes in the past.
+const SCHEDULE_GRACE_WINDOW_MS = 5 * 60 * 1000
+
+const scheduleFormSchema = z
+  .object({
+    learningItemIds: z.array(z.string()).min(1, 'Pick at least one topic'),
+    scheduledStart: z.string().min(1, 'Pick a start time'),
+    scheduledEnd: z.string().min(1, 'Pick an end time'),
+  })
+  .refine((data) => new Date(data.scheduledStart) < new Date(data.scheduledEnd), {
+    message: 'End time must be after start time',
+    path: ['scheduledEnd'],
+  })
+  .refine((data) => new Date(data.scheduledStart).getTime() > Date.now() - SCHEDULE_GRACE_WINDOW_MS, {
+    message: 'Cannot schedule sessions in the past',
+    path: ['scheduledStart'],
+  })
 
 type ScheduleFormInput = z.input<typeof scheduleFormSchema>
 type ScheduleFormValues = z.output<typeof scheduleFormSchema>
@@ -65,8 +66,8 @@ export function ScheduleSessionDialog({ open, onOpenChange, initialStart, initia
   const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: itemsApi.list })
 
   const {
-    register,
     control,
+    register,
     handleSubmit,
     reset,
     formState: { errors },
@@ -74,10 +75,12 @@ export function ScheduleSessionDialog({ open, onOpenChange, initialStart, initia
 
   useEffect(() => {
     if (open) {
+      // Start defaults to right now — starting immediately is a valid choice,
+      // not just scheduling for later.
       const start = initialStart || new Date()
       const end = initialEnd || new Date(start.getTime() + 60 * 60 * 1000)
       reset({
-        learningItemId: '',
+        learningItemIds: [],
         scheduledStart: formatDateTimeLocal(start),
         scheduledEnd: formatDateTimeLocal(end),
       })
@@ -87,7 +90,7 @@ export function ScheduleSessionDialog({ open, onOpenChange, initialStart, initia
   const mutation = useMutation({
     mutationFn: (values: ScheduleFormValues) =>
       sessionsApi.create({
-        learning_item_id: values.learningItemId,
+        learning_item_ids: values.learningItemIds,
         scheduled_start: new Date(values.scheduledStart).toISOString(),
         scheduled_end: new Date(values.scheduledEnd).toISOString(),
       }),
@@ -106,30 +109,24 @@ export function ScheduleSessionDialog({ open, onOpenChange, initialStart, initia
         <form onSubmit={(e) => void handleSubmit((v) => mutation.mutate(v))(e)} noValidate className="space-y-4">
           <DialogHeader>
             <DialogTitle className="font-heading">Schedule a study session</DialogTitle>
-            <DialogDescription>Reserve time for a topic — confirm later once you&apos;ve completed it.</DialogDescription>
+            <DialogDescription>Reserve time for one or more topics — confirm later once you&apos;ve completed it.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="schedule-topic">Topic</Label>
+            <Label htmlFor="schedule-topics">Topics</Label>
             <Controller
               control={control}
-              name="learningItemId"
+              name="learningItemIds"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="schedule-topic" className="w-full">
-                    <SelectValue placeholder="Choose what you'll study" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {items.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <TopicMultiSelect
+                  id="schedule-topics"
+                  items={items}
+                  selectedIds={field.value ?? []}
+                  onChange={field.onChange}
+                />
               )}
             />
-            {errors.learningItemId && <p className="text-sm text-destructive">{errors.learningItemId.message}</p>}
+            {errors.learningItemIds && <p className="text-sm text-destructive">{errors.learningItemIds.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

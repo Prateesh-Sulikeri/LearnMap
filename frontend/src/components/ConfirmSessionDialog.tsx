@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { sessionsApi } from '@/services/sessionsApi'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { canConfirmSession } from '@/utils/sessionStatus'
 import type { StudySession } from '@/types/api'
 import {
   Dialog,
@@ -66,6 +67,7 @@ export function ConfirmSessionDialog({ session, open, onOpenChange }: ConfirmSes
   const scheduledStart = session.scheduled_start ? new Date(session.scheduled_start) : null
   const scheduledEnd = session.scheduled_end ? new Date(session.scheduled_end) : null
   const defaultHours = scheduledStart && scheduledEnd ? (scheduledEnd.getTime() - scheduledStart.getTime()) / (1000 * 60 * 60) : undefined
+  const confirmable = canConfirmSession(session)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -84,6 +86,12 @@ export function ConfirmSessionDialog({ session, open, onOpenChange }: ConfirmSes
             </div>
           )}
 
+          {!confirmable && (
+            <p className="text-sm text-destructive">
+              This session hasn&apos;t started yet — you can confirm it once it begins.
+            </p>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="confirm-hours">
               Hours (optional — defaults to scheduled duration)
@@ -98,7 +106,7 @@ export function ConfirmSessionDialog({ session, open, onOpenChange }: ConfirmSes
           </div>
 
           <DialogFooter>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || !confirmable}>
               {mutation.isPending ? 'Confirming…' : 'Confirm session'}
             </Button>
           </DialogFooter>
