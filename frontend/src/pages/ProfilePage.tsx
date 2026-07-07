@@ -1,18 +1,19 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Check, KeyRound, Pencil, Share2 } from 'lucide-react'
+import { CalendarClock, Check, CheckCircle2, Download, KeyRound, ListTodo, Medal, Pencil, Share2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { profileApi } from '@/services/profileApi'
 import { dashboardApi } from '@/services/dashboardApi'
 import { formatOrdinalDate } from '@/utils/date'
-import { resolveAssetUrl } from '@/utils/url'
 import { SOCIAL_PLATFORMS } from '@/utils/socialPlatforms'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { ProfileStatCard } from '@/components/profile/ProfileStatCard'
+import { StatCard } from '@/components/StatCard'
+import { ProfileStatCard, type ProfileStatCardHandle } from '@/components/profile/ProfileStatCard'
 import { ContributionHeatmap } from '@/components/profile/ContributionHeatmap'
+import { AllRanksDialog } from '@/components/profile/AllRanksDialog'
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog'
 import { ChangePasswordDialog } from '@/components/profile/ChangePasswordDialog'
 
@@ -20,8 +21,10 @@ export default function ProfilePage() {
   const { user, updateUser } = useAuth()
   const { data: dashboard } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
   const { data: heatmap } = useQuery({ queryKey: ['profile-heatmap'], queryFn: profileApi.getHeatmap })
+  const statCardRef = useRef<ProfileStatCardHandle>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const [allRanksOpen, setAllRanksOpen] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
 
   if (!user) return null
@@ -45,9 +48,9 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="grid gap-6 lg:grid-cols-[340px_1fr] lg:items-start">
-        {/* Left column: identity + achievements — stays in view on desktop
-            while the right column can grow (heatmap, future stats) without
-            dragging the whole page into one long form-like scroll.
+        {/* Left column: identity + achievements, ONE avatar total — stays in
+            view on desktop while the right column can grow without dragging
+            the whole page into one long scroll.
             min-w-0 on both grid items: without it, an unwrappable child (the
             share URL below has no spaces to break on) forces the implicit
             grid track to grow past the viewport on mobile — the same class
@@ -55,21 +58,8 @@ export default function ProfilePage() {
         <div className="min-w-0 space-y-6 lg:sticky lg:top-6">
           <Card>
             <CardContent className="flex min-w-0 flex-col items-center gap-3 pt-2 text-center">
-              {user.avatar_url ? (
-                <img
-                  src={resolveAssetUrl(user.avatar_url)}
-                  alt=""
-                  className="size-20 shrink-0 rounded-full object-cover ring-4 ring-accent"
-                />
-              ) : (
-                <div className="flex size-20 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-2xl font-semibold text-primary-foreground ring-4 ring-accent">
-                  {user.display_name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className="min-w-0 max-w-full">
-                <p className="truncate font-heading text-lg font-semibold">{user.display_name}</p>
-                {user.username && <p className="truncate text-sm text-muted-foreground">@{user.username}</p>}
-              </div>
+              <ProfileStatCard ref={statCardRef} user={user} dashboard={dashboard} onBadgeClick={() => setAllRanksOpen(true)} />
+
               {user.bio && <p className="w-full text-sm break-words text-foreground">{user.bio}</p>}
 
               {activeSocials.length > 0 && (
@@ -89,7 +79,7 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              <div className="flex w-full gap-2 pt-1">
+              <div className="flex w-full gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setEditOpen(true)}>
                   <Pencil className="size-4" />
                   Edit Profile
@@ -97,6 +87,17 @@ export default function ProfilePage() {
                 <Button variant="outline" className="flex-1" onClick={() => void copyShareLink()}>
                   {linkCopied ? <Check className="size-4" /> : <Share2 className="size-4" />}
                   {linkCopied ? 'Copied' : 'Share'}
+                </Button>
+              </div>
+
+              <div className="flex w-full gap-2">
+                <Button variant="ghost" size="sm" className="flex-1" onClick={() => setAllRanksOpen(true)}>
+                  <Medal className="size-4" />
+                  View all ranks
+                </Button>
+                <Button variant="ghost" size="sm" className="flex-1" onClick={() => void statCardRef.current?.exportAsImage()}>
+                  <Download className="size-4" />
+                  Export image
                 </Button>
               </div>
 
@@ -119,12 +120,43 @@ export default function ProfilePage() {
               </Button>
             </CardContent>
           </Card>
-
-          <ProfileStatCard user={user} dashboard={dashboard} />
         </div>
 
-        {/* Right column: activity — the part that actually grows over time. */}
+        {/* Right column: real stats, not empty space — top topics and a
+            heatmap, both fed by data already being fetched on this page. */}
         <div className="min-w-0 space-y-6">
+          {dashboard && (
+            // auto-fit/minmax reflows based on the actual available width —
+            // not just viewport size — since this grid competes with the
+            // sticky left column and sidebar nav for space, a plain sm:/md:
+            // breakpoint could still land on a too-narrow in-between width.
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-4">
+              <StatCard label="Hours this week" value={dashboard.study_hours_this_week.toFixed(1)} icon={CalendarClock} />
+              <StatCard label="Completed" value={String(dashboard.completed_items)} icon={CheckCircle2} />
+              <StatCard label="Pending" value={String(dashboard.pending_items)} icon={ListTodo} />
+            </div>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-heading text-base">Top topics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!dashboard || dashboard.top_topics.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Log a session to see your top topics here.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {dashboard.top_topics.map((topic) => (
+                    <li key={topic.learning_item_id} className="flex items-center justify-between text-sm">
+                      <span className="truncate">{topic.title}</span>
+                      <span className="shrink-0 font-mono text-muted-foreground">{topic.hours.toFixed(1)}h</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="font-heading">Activity</CardTitle>
@@ -139,6 +171,7 @@ export default function ProfilePage() {
 
       <EditProfileDialog user={user} open={editOpen} onOpenChange={setEditOpen} onUpdated={updateUser} />
       <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
+      <AllRanksDialog open={allRanksOpen} onOpenChange={setAllRanksOpen} currentStreak={dashboard?.current_streak ?? 0} />
     </div>
   )
 }

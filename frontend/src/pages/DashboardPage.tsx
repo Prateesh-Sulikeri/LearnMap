@@ -1,31 +1,9 @@
-import type { ComponentType } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarClock, CheckCircle2, Flame, ListTodo } from 'lucide-react'
 import { dashboardApi } from '@/services/dashboardApi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-
-interface StatCardProps {
-  label: string
-  value: string
-  icon: ComponentType<{ className?: string }>
-}
-
-function StatCard({ label, value, icon: Icon }: StatCardProps) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-4 py-4">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-          <Icon className="size-5" />
-        </div>
-        <div>
-          <p className="font-mono text-2xl leading-none font-semibold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+import { StatCard } from '@/components/StatCard'
 
 // Weekly-hours/top-topics *charts* are Milestone 4's job (Recharts); this
 // renders the same underlying dashboard data as plain stat cards + lists.
