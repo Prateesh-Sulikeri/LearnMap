@@ -2,6 +2,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Class-based dark mode (toggled via useTheme, not OS preference) — Tailwind
+   v4 defaults `dark:` to a prefers-color-scheme media query unless
+   redefined. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @import "@fontsource-variable/inter";
 @import "@fontsource/poppins/400.css";
 @import "@fontsource/poppins/500.css";
@@ -10,10 +15,13 @@
 @import "@fontsource-variable/jetbrains-mono";
 
 /*
- * LearnMap.app design tokens (light theme only — no dark mode in MVP, per
- * the design document §4 and the design-system-agent charter). Values here
- * are the literal hex codes from the design doc, kept intact rather than
- * converted to oklch, so they stay directly traceable to the spec.
+ * LearnMap.app design tokens. Light values are the literal hex codes from
+ * the design doc, kept intact rather than converted to oklch, so they stay
+ * directly traceable to the spec. Dark mode (toggled via the user menu, see
+ * useTheme) overrides the same tokens in the `.dark` block below — every
+ * component already styles itself with these semantic tokens (bg-background,
+ * text-foreground, etc.), never a literal color, so dark mode needs no
+ * per-component changes, just the token values themselves.
  */
 @theme inline {
     --font-sans: 'Inter Variable', system-ui, sans-serif;
@@ -125,6 +133,58 @@
     --chart-3: #F97316;
     --chart-4: #EF4444;
     --chart-5: #666666;
+}
+
+.dark {
+    /* Accent — same warm yellow; it's a bright brand color, not a neutral,
+       so it doesn't need a dark-mode equivalent. Text on it stays dark for
+       contrast regardless of the surrounding theme. */
+    --primary: #FACC15;
+    --primary-foreground: #222222;
+    --accent-hover: #FDE047;
+    --accent: #3D3620;
+    --accent-foreground: #FDE68A;
+
+    /* Neutrals — warm charcoal, not pure black/blue-gray, to keep the same
+       cozy character as the light theme's warm off-white. */
+    --background: #1C1B18;
+    --foreground: #F2EFE6;
+    --card: #252420;
+    --card-foreground: #F2EFE6;
+    --popover: #252420;
+    --popover-foreground: #F2EFE6;
+    --secondary: #2C2A24;
+    --secondary-foreground: #F2EFE6;
+    --muted: #2C2A24;
+    --muted-foreground: #A6A08D;
+    --border: #3A372E;
+    --input: #3A372E;
+    --ring: #FACC15;
+    --tree-line: #58533F;
+
+    /* Semantic — success/warning text steps recomputed for dark surfaces;
+       the light-mode -text steps are darkened-for-contrast-on-white and
+       would be nearly invisible on a dark background. */
+    --success: #22C55E;
+    --warning: #F97316;
+    --destructive: #EF4444;
+    --success-text: #4ADE80;
+    --warning-text: #FB923C;
+
+    --sidebar: #1C1B18;
+    --sidebar-foreground: #F2EFE6;
+    --sidebar-primary: #FACC15;
+    --sidebar-primary-foreground: #222222;
+    --sidebar-accent: #3D3620;
+    --sidebar-accent-foreground: #FDE68A;
+    --sidebar-border: #3A372E;
+    --sidebar-ring: #FACC15;
+
+    --chart-1: #FACC15;
+    --chart-2: #22C55E;
+    --chart-3: #F97316;
+    --chart-4: #F87171;
+    --chart-5: #A6A08D;
 }
 
 @layer base {

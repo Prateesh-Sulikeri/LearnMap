@@ -1,31 +1,21 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  CalendarClock,
-  LayoutDashboard,
-  ListTree,
-  LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-  UserRound,
-} from 'lucide-react'
+import { CalendarClock, LayoutDashboard, ListTree, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useAuth } from '@/hooks/useAuth'
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
+import { UserMenu } from '@/components/UserMenu'
 import { dashboardApi } from '@/services/dashboardApi'
-import { resolveAssetUrl } from '@/utils/url'
-import { getStreakRank } from '@/utils/streakRank'
 import { cn } from '@/lib/utils'
 
+// Profile is reachable via the account menu (bottom-left avatar) now, not a
+// separate nav tab — it was a second, redundant way to do the same thing.
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/tree', label: 'Learning', icon: ListTree },
   { to: '/sessions', label: 'Sessions', icon: CalendarClock },
-  { to: '/profile', label: 'Profile', icon: UserRound },
 ] as const
 
 const PAGE_TITLES: Record<string, string> = {
@@ -79,14 +69,11 @@ function getBreadcrumbs(pathname: string, search: string): Crumb[] {
 // widths (mobile-first requirement, ADR-012).
 export default function AppLayout() {
   const location = useLocation()
-  const { logout, user } = useAuth()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
   const { data: dashboard } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
 
   const breadcrumbs = getBreadcrumbs(location.pathname, location.search)
-  const rank = getStreakRank(dashboard?.current_streak ?? 0)
-  const RankIcon = rank.icon
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background md:flex-row">
@@ -154,41 +141,17 @@ export default function AppLayout() {
           })}
         </nav>
 
-        <div className="mt-auto space-y-2 px-1">
-          {!sidebarCollapsed && user && (
-            <Link to="/profile" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
-              {user.avatar_url ? (
-                <img src={resolveAssetUrl(user.avatar_url)} alt="" className="size-6 shrink-0 rounded-full object-cover" />
-              ) : (
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[0.6rem] font-semibold text-primary-foreground">
-                  {user.display_name.charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="min-w-0">
-                <span className="block truncate">{user.display_name}</span>
-                <span className={cn('flex items-center gap-1 text-[0.65rem] font-medium', rank.color)}>
-                  <RankIcon className="size-3 shrink-0" />
-                  {rank.name}
-                </span>
-              </span>
-            </Link>
+        <div className="mt-auto px-1">
+          {sidebarCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger render={<span />}>
+                <UserMenu variant="sidebar-collapsed" currentStreak={dashboard?.current_streak ?? 0} />
+              </TooltipTrigger>
+              <TooltipContent side="right">Account</TooltipContent>
+            </Tooltip>
+          ) : (
+            <UserMenu variant="sidebar" currentStreak={dashboard?.current_streak ?? 0} />
           )}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn('w-full', sidebarCollapsed ? 'justify-center px-0' : 'justify-start px-0')}
-                  onClick={() => void logout()}
-                />
-              }
-            >
-              <LogOut className="size-4" />
-              {!sidebarCollapsed && 'Log out'}
-            </TooltipTrigger>
-            {sidebarCollapsed && <TooltipContent side="right">Log out</TooltipContent>}
-          </Tooltip>
         </div>
       </aside>
 
@@ -230,6 +193,7 @@ export default function AppLayout() {
             {label}
           </Link>
         ))}
+        <UserMenu variant="mobile" currentStreak={dashboard?.current_streak ?? 0} />
       </nav>
 
       {/* Floating add button — every page, per the design doc */}

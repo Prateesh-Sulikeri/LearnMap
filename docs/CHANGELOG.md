@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Account menu and dark mode (2026-07-08)
+- Removed "Profile" as a separate nav tab — it duplicated the sidebar's existing bottom-left avatar/name, which already linked there.
+- The bottom-left avatar (and its mobile bottom-bar equivalent, "Account") now opens a menu with My Profile, a Light/Dark Mode toggle, and Logout — consolidating what used to be three separate ways to reach the same handful of account actions. New `UserMenu` component, reused across the expanded sidebar, collapsed sidebar, and mobile bottom bar.
+- Added a real, user-toggleable light/dark theme (previously light-only — see ADR-032): a `ThemeProvider` persists the choice to localStorage and toggles a `.dark` class at the app root. Every existing component already styled itself with semantic tokens (`bg-background`, `text-foreground`, etc.), never a literal color, so the whole app re-themes correctly with no other code changes — verified across Dashboard, Learning, the login page, and both sidebar states.
+
 ### Session persistence, completion rule, and log-from-notes (2026-07-07)
 - Fixed: sessions could get logged out unexpectedly after some time despite refresh tokens existing. Root cause: refresh-token rotation revoked the previous token instantly, so two tabs/devices sharing one login (explicitly a design goal — ADR-010) whose access tokens happened to expire close together would race on `/auth/refresh`; the loser's request, carrying the now-superseded token, was rejected outright even though the session was never actually compromised. Fixed with a 30-second reuse grace window on rotation (ADR-031) — a well-established pattern (used by Supabase/GoTrue, among others) for exactly this race, without meaningfully weakening protection against a genuinely stolen token.
 - Added: an item can only be marked complete if it has no sub-items, or every sub-item is already complete — attempting otherwise is rejected with a clear message ("complete every sub-item before marking this one complete"). Reopening a sub-item (or adding a new, incomplete one) now cascades a reopen up through any ancestor that was completed, since "all children completed" is no longer true for it either — otherwise a completed parent could silently end up with an incomplete child.

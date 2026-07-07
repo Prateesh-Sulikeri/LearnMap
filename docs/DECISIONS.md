@@ -1,5 +1,19 @@
 # LearnMap.app — Architecture Decision Records
 
+## ADR-032: User-toggleable light/dark theme, reversing the original light-only decision
+
+**Decision:** Added a real dark theme alongside the existing light one, switchable from the new account menu and persisted client-side (`ThemeProvider`/`useTheme`, `localStorage`). Implemented via Tailwind v4's `@custom-variant dark (&:where(.dark, .dark *))` plus a `.dark { ... }` block in `index.css` overriding the same CSS custom properties the light theme already defines — not a media-query-driven (`prefers-color-scheme`) dark mode, since the requirement is an explicit user toggle, not following the OS.
+
+**Context:** The original design document specified light theme only, carried into this project's own CLAUDE.md as a hard UI requirement. Direct instruction reversed that: build a proper, toggleable theme switcher.
+
+**Alternatives considered:** OS-preference-only dark mode (`prefers-color-scheme`, no manual override) — rejected, since the ask was specifically for a user-facing toggle. Per-component dark-mode class overrides — unnecessary and rejected: every component already styles itself through semantic tokens (`bg-background`, `text-foreground`, `bg-card`, etc.), confirmed by grepping for hardcoded colors (none found outside a couple of intentional cases — button-internal `text-white` on `bg-destructive`, and overlay scrims' `bg-black/10`, neither of which should vary by theme). Overriding just the token values at the `.dark` selector re-themes the entire app with no other code changes.
+
+**Reasoning:** Dark palette values are a warm charcoal (not pure black/blue-gray) to keep the same cozy character as the light theme's warm off-white, with the brand yellow (`--primary`) kept identical in both themes since it's an accent color, not a neutral. `--success-text`/`--warning-text` (ADR from the M5 contrast-audit pass) needed separate dark-mode values — the light-mode steps were darkened specifically for contrast against a *light* background and would be nearly invisible against a dark one.
+
+**Status:** Approved and implemented (`frontend/src/hooks/useTheme.tsx`, `frontend/src/index.css`, `frontend/src/components/UserMenu.tsx`). `.claude/CLAUDE.md`'s UI requirements section updated to match.
+
+---
+
 ## ADR-031: 30-second grace window on refresh token rotation reuse
 
 **Decision:** A refresh token rotated (superseded) by a `/auth/refresh` call remains usable for `RefreshTokenReuseGrace` (30 seconds) after that rotation, rather than being instantly and permanently rejected. Reuse within the window succeeds and mints a fresh access/refresh pair, same as normal; reuse after the window is rejected exactly as before. The rotated token's `revoked_at` is set once, at first use, and not bumped forward by grace-window reuse — so the window has a fixed expiry from the original rotation rather than being extendable forever.

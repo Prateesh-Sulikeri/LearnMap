@@ -76,7 +76,7 @@ Backend
 UI REQUIREMENTS
 ==========================
 
-Light theme only.
+Light and dark theme, user-toggleable (updated 2026-07-08 — originally light-only; a working toggle now exists in the account menu, persisted client-side). Every component styles itself with semantic tokens (bg-background, text-foreground, etc.), never a literal color, so both themes stay in sync automatically.
 
 Accent:
 Warm Yellow (#FACC15)
