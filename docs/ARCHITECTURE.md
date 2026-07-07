@@ -1,6 +1,6 @@
 # LearnMap.app — Architecture
 
-Status: **Milestone 1 complete** (backend foundation + auth) — implemented, tested, and reviewed. Milestone 2 (frontend) not yet started.
+Status: **Milestones 1-5 complete** (backend foundation, frontend, study sessions/profile, charts & statistics, polish & cross-device QA). Milestone 6 (deployment) not started — **the project is not deployment-ready.**
 
 > **Scope note (2026-07-06):** the original design document (`docs/DD_v1.pdf`) specified a local, single-user, SQLite-backed tool with no auth. The user has since directed that LearnMap.app be **hosted, multi-user, with authentication and profiles**, usable from a phone and a laptop, with pilot testing across multiple people and screen sizes. This document reflects the updated scope. See `docs/DECISIONS.md` ADR-007 onward.
 
@@ -92,23 +92,35 @@ frontend/src/
                        OrgChartNode (top-down org-chart view), NoteIndicator (notes trigger button)
     notes/             NotesEditorDialog (markdown + toolbar + preview + TOC), MarkdownToolbar,
                        MarkdownPreview
-    profile/           ProfileStatCard (shareable stat card, exported as PNG via html-to-image)
-    ItemFormDialog, DeleteItemDialog, AddSessionDialog, DeleteSessionDialog — CRUD dialogs
-  pages/              Login, Register, Dashboard, LearningTree, StudySessions, Profile, Trash
+    profile/           ProfileStatCard (streak/stats hero, embeddable — exposes exportAsImage() via a
+                       ref, not its own <Card>), EditProfileDialog, ChangePasswordDialog
+    charts/            ChartTooltip (shared, matches card/popover styling), WeeklyHoursChart,
+                       TopTopicsChart, CompletionMeter (a radial meter, not a pie), HoursTrendChart
+                       (single-series area chart, reused for week/month/year on the Statistics page)
+    StatCard.tsx        shared stat-tile (icon + value + label), used on Dashboard and Profile
+    TopicMultiSelect.tsx a session can cover more than one topic — built on the existing
+                       DropdownMenuCheckboxItem, no new dependency
+    ItemFormDialog, DeleteItemDialog, AddSessionDialog, ScheduleSessionDialog, ConfirmSessionDialog,
+                       SessionDetailsDialog, DeleteSessionDialog — CRUD/scheduling dialogs
+  pages/              Login, Register, Dashboard, LearningTree, StudySessions, Statistics, Profile, Trash
   layouts/            AppLayout (nav + breadcrumb + floating add button); AuthLayout
   routes/              route table incl. a ProtectedRoute wrapper (redirect to /login if unauthenticated)
   hooks/               useAuth, useLearningTree, useCollapsedState/useSidebarCollapsed/useTreeViewMode (localStorage)
   services/            one file per API resource; TanStack Query hooks + Axios calls live here ONLY
     authApi.ts          register/login/refresh/logout/me — manages access token in memory
     itemsApi.ts          also list/restore trash
-    sessionsApi.ts
-    dashboardApi.ts
+    sessionsApi.ts       includes confirm() for the honor-system scheduling flow
+    dashboardApi.ts      also getStats(range) for the Statistics page
     profileApi.ts
     uploadsApi.ts        image upload for notes (multipart)
     client.ts            axios instance: attaches Bearer token, `withCredentials: true` for the refresh cookie, 401 → single silent refresh attempt → else logout; exports API_ORIGIN for resolving root-relative upload URLs
   types/               shared TS types mirroring the API contract
-  utils/               pure helpers (tree assemble/search/findNodeById/completion-count, markdown-editing cursor helpers, ordinal date formatting)
+  utils/               pure helpers (tree assemble/search/findNodeById/completion-count, markdown-editing cursor helpers, ordinal date formatting, sessionStatus.ts's upcoming/in_progress/expired/logged state machine)
 ```
+
+**A page's `?query=param` is the state, not local component state, wherever the page has a shareable "mode."** The Learning page's Active/Completed/Favs tab and search query, and the Statistics page's Week/Month/Year range, all live in the URL — `?range=month` is a real, shareable, back-button-friendly link. Adopt this convention for any future page-level toggle rather than local `useState`.
+
+**AppLayout's shell is `flex flex-col md:flex-row`, not just `md:flex`.** The inner content container's `flex-1` (which bounds it to the remaining viewport height so its own `overflow-y-auto` can do the actual scrolling, independent of the sidebar) only takes effect when its parent is a flex container — `md:flex` alone meant the whole page was unscrollable below the `md` breakpoint. If this shell is ever restructured, keep the base `flex` unconditional.
 
 **Search is page-local, not global chrome.** Only the Learning page has anything to search, so the search input lives there, not in `AppLayout`'s header (an earlier version put it in the shared header for every page — removed once it became clear it was inert everywhere but Learning).
 
@@ -175,14 +187,28 @@ Indexes: `(user_id)`, `(user_id, parent_id)`, `(user_id, status)`, `(deleted_at)
 |-------------------|-------------|-------------------------------------------------|
 | id                | UUID PK     |                                                    |
 | user_id           | UUID FK     | → users.id, NOT NULL (denormalized, ADR-011)      |
-| learning_item_id  | UUID FK     | → learning_items.id, NOT NULL                     |
-| hours             | REAL        | NOT NULL, CHECK (hours > 0 AND hours <= 24)       |
+| learning_item_id  | UUID FK     | → learning_items.id, NOT NULL — the "primary" topic (first one chosen); kept for backward compatibility and simple single-topic queries. A session's full topic set lives in `study_session_topics` below. |
+| hours             | REAL        | NOT NULL, CHECK (hours >= 0 AND hours <= 24) — relaxed from `> 0` (migration `000010`) so a pending scheduled session can legitimately be 0 until confirmed |
 | notes             | TEXT        | nullable                                           |
 | session_date      | DATE        | NOT NULL                                           |
+| scheduled_start   | TIMESTAMPTZ | nullable (migration `000009`) — null for old-style retroactive logs; set for scheduled sessions and for retroactive logs that specify exact times |
+| scheduled_end     | TIMESTAMPTZ | nullable (migration `000009`) — session is "pending" (awaiting honor-system confirmation) when this is set and `confirmed_at` is null |
+| confirmed_at      | TIMESTAMPTZ | nullable (migration `000009`) — set when a scheduled session is confirmed complete, or immediately at creation for a retroactive log with exact times (logging after the fact means it already happened) |
 | created_at        | TIMESTAMPTZ | NOT NULL DEFAULT now()                             |
 | deleted_at        | TIMESTAMPTZ | nullable — soft delete                             |
 
-Indexes: `(user_id)`, `(user_id, session_date)`, `(learning_item_id)`.
+Indexes: `(user_id)`, `(user_id, session_date)`, `(learning_item_id)`, `(user_id, scheduled_end, confirmed_at)` partial index where `scheduled_end IS NOT NULL`.
+
+### `study_session_topics` (migration `000011`)
+
+A session can cover more than one topic (e.g. two related subjects studied in one sitting). Many-to-many join table, always populated for every session going forward (including single-topic ones, so `TopTopics` queries can join through it uniformly) — existing rows were backfilled from their single `learning_item_id` at migration time.
+
+| Column            | Type    | Notes                                    |
+|-------------------|---------|----------------------------------------------|
+| study_session_id  | UUID FK | → study_sessions.id, part of composite PK, ON DELETE CASCADE |
+| learning_item_id  | UUID FK | → learning_items.id, part of composite PK, ON DELETE CASCADE |
+
+Index: `(learning_item_id)`.
 
 ### `events` (append-only, not exposed via API — future AI hook)
 
@@ -220,10 +246,11 @@ Base path `/api/v1`. All routes except `auth/register`, `auth/login`, `auth/refr
 | PATCH  | /items/:id/favorite            | yes  | toggle is_favorite (independent of status) |
 | DELETE | /items/:id                    | yes  | soft-delete item + descendants + sessions |
 | GET    | /sessions                     | yes  | list caller's sessions (filterable)       |
-| POST   | /sessions                      | yes  | log a session                              |
+| POST   | /sessions                      | yes  | log a retroactive session (`session_date` given) or schedule a future one (`session_date` omitted, `scheduled_start`/`scheduled_end` given instead) — `learning_item_ids` is an array, one or more topics |
+| POST   | /sessions/:id/confirm            | yes  | honor-system: confirm a scheduled session complete (only once `now >= scheduled_start`); optional hours/notes override |
 | DELETE | /sessions/:id                  | yes  | delete a session                          |
-| GET    | /dashboard                     | yes  | aggregate dashboard payload                |
-| GET    | /stats?range=week\|month\|year | yes  | chart data                                 |
+| GET    | /dashboard                     | yes  | aggregate dashboard payload (stat cards + chart data for the Dashboard page) |
+| GET    | /stats?range=week\|month\|year | yes  | chart data for the dedicated Statistics page |
 | GET    | /items/trash                    | yes  | list soft-deleted "trash roots" (ADR-003); also lazily purges anything past the 7-day retention period (ADR-026) |
 | DELETE | /items/trash                    | yes  | "Empty Trash" — hard-delete everything currently in the trash |
 | POST   | /items/:id/restore               | yes  | undo a soft-delete, cascades like Delete   |
@@ -299,3 +326,5 @@ Rationale for no caching: each user's dataset is tiny (dozens–hundreds of rows
 - **2026-07-06**: Phase 2 AI-readiness architecture (§7) and AWS pilot hosting topology (§6) added in response to a scalability question, ADR-017 through ADR-021 — no code, architecture placeholders only.
 - **2026-07-06**: Milestone 1 (Backend Foundation + Auth) implemented, tested, and reviewed. Two review-driven fixes applied before sign-off: (1) `EventService.Record` now logs failures instead of silently discarding them — a swallowed audit-log write would quietly undermine the event table's whole purpose; (2) `handlers.RespondError` matches service errors via `errors.As` instead of a direct type assertion, for robustness against wrapped errors. Actual folder structure ended up with two packages not in the original plan: `internal/apperror` (typed service errors) and `internal/testutil` (real-Postgres test helper) — both are small, load-bearing, and consistent with the layering rules already established, not scope creep.
 - **2026-07-07**: Post-Milestone-3 UX/feature pass, driven directly by the user testing the running app rather than by a new milestone plan. Added: a recycle bin (`GET /items/trash`, `POST /items/:id/restore`, mirroring Delete's cascade); a top-down org-chart view of the learning map (`OrgChartTree`/`OrgChartNode`) as an alternative to the indented list, toggled per-user preference, with an Active/Completed tab split on top-level topics; a full notes feature (markdown + toolbar + live preview, images uploaded from the device via the new local-disk-backed `/uploads` endpoint — ADR-022 — and an auto-generated table of contents for root topics that hands off between items' notes); a shareable Profile stat card exportable as a PNG. Removed the global search bar from `AppLayout` (dead chrome everywhere except Learning) in favor of a page-local one. None of this was scoped in the original Milestone 4-6 plan; it's UX polish requested directly against the running Milestone-3 build, applied without deferring to a formal milestone boundary since the user explicitly prioritized it over starting Milestone 4.
+- **2026-07-07**: Study Sessions calendar completed end to end (day/week/month toggle, day-detail panel), plus a new concept not in the original design doc: scheduled sessions with honor-system completion (`scheduled_start`/`scheduled_end`/`confirmed_at` on `study_sessions`, migrations `000009`-`000010`) and multi-topic sessions (`study_session_topics` join table, migration `000011`) — a session can now cover more than one topic. Profile page redesigned to a two-column dashboard layout; public profile redesigned with a hero cover band. Fixed an app-wide scroll bug (the shell was `md:flex`, not unconditionally `flex`, so pages were unscrollable below the `md` breakpoint whenever content exceeded one viewport's height) and a CSS Grid track-sizing bug on Profile (an unwrappable long string forcing the grid wider than the viewport) — both are now documented patterns to watch for (see §3's callouts above).
+- **2026-07-07**: Milestones 4 (Charts & Statistics) and 5 (Polish & Cross-Device QA) completed together per direct instruction. Dashboard landing page chart-ified in place (Weekly Hours, Top Topics, Completion %); new dedicated Statistics page (`/stats`) added with a Weekly/Monthly/Yearly toggle, backed by the `/stats` endpoint that had existed since Milestone 1 with no consumer or tests until now. `recharts` added as a new dependency. Cross-device QA substituted Playwright (driving the real dev server at phone/tablet/laptop widths) for physical-device testing, which isn't possible in this environment — this is the first time in the project browser automation has actually been used, closing a gap flagged since Milestone 2. Computed real WCAG contrast ratios rather than eyeballing them; found and fixed `--success`/`--warning` failing AA as text (added `--success-text`/`--warning-text`, darker steps of the same hue, for the handful of actual-text usages — icon fills unchanged). The project is not deployment-ready; only Milestone 6 remains.

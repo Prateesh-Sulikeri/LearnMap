@@ -2,12 +2,38 @@
 
 ## [Unreleased]
 
+### Milestone 5 — Polish & Cross-Device QA (2026-07-07)
+- Fixed: ProfilePage's dashboard/heatmap queries had no loading skeleton or error message (an empty-state audit gap).
+- Fixed: `--success`/`--warning` failed WCAG AA contrast when used as text (they were designed for icon fills only) — added `--success-text`/`--warning-text`, darker steps of the same hue, applied to the handful of actual-text usages (completed-item strikethrough titles, "In progress" labels); icon fills unchanged.
+- Fixed (found via a Playwright cross-device pass, substituting for physical-device testing): an app-wide scroll bug below the `md` breakpoint — every page was unscrollable on phone/narrow-tablet widths whenever content exceeded one viewport's height, because the app shell was `md:flex` and the inner scrollable container's `flex-1` never took effect below 768px.
+- Fixed (same pass): a CSS Grid overflow on the Profile page (an unwrappable share-URL string forced the grid wider than a mobile viewport); the Learning page's search bar shrinking to an illegible sliver instead of wrapping; the Study Sessions header buttons overflowing off-screen instead of wrapping.
+- Confirmed all 6 of DD_v1.pdf §17's Success Criteria are met against the current build.
+
+### Milestone 4 — Charts & Statistics (2026-07-07)
+- Added dedicated test coverage for `GET /stats?range=week|month|year` (scaffolded since Milestone 1, never had tests or a frontend consumer until now): aggregation math per range, invalid-range rejection, cross-user isolation.
+- Chart-ified the Dashboard landing page: Weekly Hours (bar chart), Top Topics (ranked horizontal bar chart, replacing the old plain list), Completion % (a radial meter).
+- Added a dedicated Statistics page (`/stats`) with a Weekly/Monthly/Yearly toggle (range lives in the URL, shareable) driving one area chart. New nav entry.
+- Added `recharts` and a new `components/charts/` directory; extracted a shared `components/StatCard.tsx` (now used on both Dashboard and Profile).
+- Fixed: Dashboard's 4-stat-card row truncated every label to a single letter around the tablet breakpoint (same root cause as the Profile grid-overflow fix below) — switched to `grid-cols-[repeat(auto-fit,minmax(...))]`.
+
+### Study Sessions calendar, scheduling, and multi-topic sessions — stages 2-3 (2026-07-07)
+- Completed the Study Sessions Teams-style calendar: defaults to Week view, visible current-day highlight, working Today/Back/Next navigation, scrolls to the current hour on load, a day-detail side panel (defaults to today, "No data available" when empty).
+- Added scheduled sessions (honor-system completion) end to end: migrations `000009`/`000010` (scheduling columns + a relaxed hours constraint for the 0-hours pending state), `CreateScheduled`/`ConfirmScheduled` service methods, `POST /sessions/:id/confirm`.
+- Added a confirm-timing gate (can't confirm before a session's scheduled window has started, enforced both server-side and in the UI) and a 5-minute "start now" grace window (picking "right now" as a start time shouldn't be rejected just because a few seconds pass before the request lands).
+- Added multi-topic sessions: one session can cover more than one topic (new `study_session_topics` join table, migration `000011`, a `TopicMultiSelect` component); `TopTopics` now attributes a session's full hours to every topic it covers.
+- Added the Dashboard's adaptive recent-activity window: shows today's activity if there's ≥10 items, otherwise expands to the past 7 days.
+- Fixed several real bugs found via live verification during this work: a DB CHECK constraint rejecting the legitimate 0-hours pending-session state; a double-JSON-body-read bug from one handler calling another as a sub-handler; missing server-side past-date validation on scheduling; a stale-running-backend-container issue (same class as a prior incident — `go run` doesn't hot-reload) that made a fix look like it hadn't landed.
+
+### Profile page redesign; public profile redesign (2026-07-07)
+- Replaced the single long stacked-form Profile page with a two-column dashboard layout: an identity card (avatar/name/username/bio/socials/Edit-Share buttons, merged with the streak/stats hero — one avatar, not two) on the left, stat tiles/top-topics/activity heatmap on the right. Edit-profile and change-password forms moved into dialogs instead of always being rendered inline.
+- Redesigned the public profile (`/u/:username`): a hero cover band with the avatar overlapping it, streak-rank and active-days stat tiles, a nicer tooltip-labeled socials row — replacing the previous flat centered gradient card.
+- Fixed a CSS Grid track-sizing bug: an unwrappable long string (the share-profile URL) forced the grid wider than a mobile viewport, clipping/shifting all card content — same class of bug flagged as a past incident in ARCHITECTURE.md. Fixed with `min-w-0` on the grid items.
+
 ### Profile: heatmap, bio/socials, shareable public profiles (2026-07-07, stage 1 of a 3-part round)
 - Added a GitHub-contribution-graph-style activity heatmap (`ContributionHeatmap`, custom-built) to the Profile page, backed by a new `GET /profile/heatmap` endpoint (365 days of daily study hours).
 - Added bio, a chosen unique username, and six social links (LinkedIn/GitHub/Instagram/X/LeetCode/portfolio) to the profile. Added `react-icons` (brand logos only — lucide-react no longer ships those).
 - Added shareable public profiles at `/u/:username`: public by default with an opt-out toggle, no auth required to view, shows avatar/bio/socials/streak-rank/heatmap only (never learning-item content). A private or nonexistent username both return an identical 404.
 - New `users` columns (migration `000008`): `username` (unique, lowercased on write), `bio`, `social_links` (JSONB), `is_public`.
-- Remaining from the same round, not yet done: the Study Sessions Teams-style calendar (day/week/month + scheduling + honor-system completion) and the Dashboard's adaptive recent-activity window.
 
 ### Follow-up fixes: trash routing, numbering scope, Favs tab (2026-07-07)
 - Fixed: "Empty Trash" and permanent delete appeared broken from the UI — actually a stale running backend container (routes were correct in code, just not yet restarted to pick them up); no code fix needed, just a restart.

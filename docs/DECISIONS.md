@@ -1,5 +1,35 @@
 # LearnMap.app — Architecture Decision Records
 
+## ADR-029: `study_sessions.learning_item_id` kept as "primary," full topic set in a join table
+
+**Decision:** A study session can cover more than one topic. Rather than replacing the existing `study_sessions.learning_item_id` column, added a new `study_session_topics` many-to-many join table (migration `000011`) holding the full topic set for every session — including single-topic ones, backfilled from their existing `learning_item_id` at migration time. `learning_item_id` stays as the "primary" (first-chosen) topic.
+
+**Context:** Sessions originally had a single required topic. A direct request ("schedule a session for multiple topics") needed a real schema change, not just a UI tweak.
+
+**Alternatives considered:** Making `learning_item_id` nullable and moving fully to the join table — rejected because it would require touching every existing query and the cascade-delete behavior on the primary column (deleting a learning item cascades to delete its sessions; losing that column would need reimplementing the cascade at the application layer). Storing a JSON/array column of topic IDs directly on `study_sessions` — rejected because it can't be indexed or joined the way a normal relational table can (the `TopTopics` aggregate query needs to join against `learning_items` per topic, not per session).
+
+**Reasoning:** Keeping the legacy column means zero behavior change for every existing single-topic query and the existing cascade-delete-on-primary-topic semantics, while the join table is the source of truth for the full set going forward. `TopTopics` now joins through `study_session_topics` so a session's full hours attribute to *every* topic it covers (not split) — a 2-hour session spanning two topics counts as 2h toward each, a deliberate simplification consistent with how multi-topic sessions are presented everywhere else in the UI (comma-joined topic titles, no per-topic hour breakdown).
+
+**Known limitation, accepted:** if a session's *primary* topic is deleted, the whole session cascades away via the existing FK on `learning_item_id` — even if the session still logically covers other, non-deleted topics. Fixing this fully would mean making `learning_item_id` nullable plus application-level reassignment logic; judged not worth the complexity for a pilot-scale edge case.
+
+**Status:** Approved and implemented (migration `000011`; `models.StudySessionTopic`; `StudySessionRepository.AddTopics`/`TopicIDsForSessions`; `StudySessionService.validateTopics`; `TopicMultiSelect` component).
+
+---
+
+## ADR-028: Scheduled sessions confirm only once their window has started; a 5-minute grace window on "now"
+
+**Decision:** A scheduled (honor-system) session can only be confirmed once `now >= scheduled_start` — not before, whether the session hasn't begun yet or has already ended. Enforced server-side (`StudySessionService.ConfirmScheduled`), not just in the UI. Separately, `CreateScheduled`'s "must be in the future" check tolerates `scheduled_start` being up to 5 minutes in the past (`scheduleGraceWindow`), both server-side and in the frontend's matching validation.
+
+**Context:** Two direct bug reports in the same round: confirming a session before it had even started didn't make sense (the honor system means "did you do it," which presupposes the window has opened), and picking "start right now" when scheduling was effectively broken — by the time the request reached the server, the instant the user picked was already a few seconds or minutes in the past (`datetime-local` only has minute granularity, and filling out the rest of the form takes time), so a strict `> now` check on the backend rejected a legitimate, common choice.
+
+**Alternatives considered:** Relying on frontend-only validation for the confirm-timing gate — rejected as insufficient; a direct API call could bypass client-side validation entirely (verified by testing a raw curl request, which succeeded before the server-side check was added). No grace window at all on scheduling — rejected because it makes "start now" unusable, which was the explicit ask.
+
+**Reasoning:** 5 minutes was chosen as generous enough to absorb realistic form-fill time and clock skew without meaningfully weakening the "must be in the future" intent (a user attempting to schedule something clearly in the past, e.g. yesterday, is still correctly rejected).
+
+**Status:** Approved and implemented (`StudySessionService.CreateScheduled`/`ConfirmScheduled`; `ScheduleSessionDialog`'s matching frontend validation; `utils/sessionStatus.ts`'s upcoming/in_progress/expired/logged state machine, which gates the Confirm button's visibility in the UI to match).
+
+---
+
 ## ADR-027: Username-based public profiles, public-by-default with an opt-out toggle
 
 **Decision:** Public profile sharing uses a user-chosen, unique username (`/u/<username>`), not the raw user ID. Profiles are public by default (`is_public = true` on creation) but can be toggled off in Profile settings. A user has no shareable link at all until they set a username — `IsPublic` defaults true independent of whether `Username` is set.

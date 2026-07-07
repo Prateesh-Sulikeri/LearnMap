@@ -1,12 +1,12 @@
 # LearnMap.app — Project Status
 
-**Last updated:** 2026-07-07 (Profile/Sessions/Dashboard expansion, stage 2 of 3 — Sessions/Dashboard — in progress)
+**Last updated:** 2026-07-07 (Milestones 4 and 5 complete)
 
 ## Current Milestone
-Milestone 4 — Charts & Statistics (not started; a substantial UX/feature pass happened first — see below)
+Milestone 6 — Deployment & Pilot Rollout (not started). **The project is not deployment-ready** — see Technical Debt below for what's still missing (containerization, persistent object storage for uploads, production secrets/CORS, etc.).
 
 ## Overall Completion
-~50% of MVP (Milestones 1-3 of 6 complete), plus a significant unplanned UX/feature pass on top of Milestone 3 (see "Features Completed").
+~83% of MVP (Milestones 1-5 of 6 complete), plus a significant unplanned UX/feature pass on top of Milestone 3 (see "Features Completed"). Only Milestone 6 (deployment) remains.
 
 ## Scope
 Hosted, multi-user learning tracker with authentication and profiles, used from phones and laptops, pilot-tested by multiple people across multiple screen sizes.
@@ -58,21 +58,33 @@ Three items from the same Todo were explicitly scoped down or deferred after ask
   - Shareable public profiles at `/u/:username` (ADR-027): public by default, an opt-out toggle in Profile settings, no auth required to view. Shows avatar/name/bio/socials/streak-rank/heatmap only — never learning-item content, which stays private. A private or nonexistent username returns the identical 404 (ADR-016's existing "don't distinguish the reasons" rule)
   - New `users` columns: `username` (nullable, unique, lowercased on write), `bio`, `social_links` (JSONB), `is_public` (migration `000008`)
 
-- **Stage 2 (Sessions/Dashboard) — IN PROGRESS:**
-  - Study Sessions: calendar now defaults to Week view (not Month); removed duplicate table below calendar
-  - Scheduled sessions (honor-system completion):
-    - Backend: migration 000009 adds scheduled_start, scheduled_end, confirmed_at to study_sessions; CreateScheduled() service reserves future blocks, ConfirmScheduled() marks complete
-    - Frontend: ScheduleSessionDialog component for selecting topic + start/end times; ConfirmSessionDialog for confirming with optional hours/notes; both wired into StudySessionsPage
-    - API: flexible POST /sessions for both retroactive and scheduled sessions; new POST /sessions/:id/confirm for completion
+- **Stage 2 (Sessions/Dashboard) — DONE:**
+  - Study Sessions calendar: defaults to Week view, current-day highlight, working Today/Back/Next navigation, `scrollToTime` to the current hour, day-detail side panel (defaults to today, shows "No data available" when empty)
+  - Scheduled sessions (honor-system completion) end to end: migration 000009 (`scheduled_start`/`scheduled_end`/`confirmed_at`), migration 000010 (relaxed the `hours` CHECK constraint to allow the 0-hours pending state), `CreateScheduled()`/`ConfirmScheduled()` service methods, `POST /sessions/:id/confirm`
+  - Confirm-timing gate: a scheduled session can only be confirmed once its window has actually started (`now >= scheduled_start`) — enforced both server-side and in the UI's 3-state model (upcoming/in_progress/expired), not just client-side
+  - "Start now" scheduling: a 5-minute grace window (both frontend and backend) so picking "right now" as a start time isn't rejected just because a few seconds pass before the request lands
+  - Multi-topic sessions: a session can cover more than one topic (new `study_session_topics` join table, migration 000011; `TopicMultiSelect` component; `TopTopics` attributes full hours to every topic a session covers)
   - Dashboard: adaptive recent-activity window — shows today's activity if >= 10 items, otherwise expands to past 7 days
-  - **Still TODO:** calendar drag-to-schedule, day-detail side panel, styling for expired sessions, comprehensive testing
 
-## Features In Progress
-- Study Sessions: Calendar drag-to-schedule, day-detail side panel (clicking day shows sessions in right panel), visual styling for expired scheduled sessions (grayed-out with "Did you complete?" action)
-- Milestone 4 (Charts & Statistics): not yet started
+**Profile page redesign (2026-07-07):** two-column dashboard layout (identity card + streak/stats hero on the left, stat tiles/top-topics/activity heatmap on the right) replacing the old single long form; edit/password forms moved into dialogs. Public profile (`/u/:username`) redesigned with a hero cover band, avatar overlapping it, and streak/active-days stat tiles. Fixed two real bugs surfaced by this work: a duplicate avatar (merged `ProfileStatCard` into the identity card instead of rendering it as a second card), and a CSS Grid track-sizing bug where an unwrappable long URL forced the grid wider than the mobile viewport (`min-w-0` on the grid items).
+
+**App-wide scroll bug fix (2026-07-07):** every page was unscrollable on phone/narrow-tablet widths (below the `md` 768px breakpoint) whenever content exceeded one viewport's height. Root cause: `AppLayout`'s shell was `md:flex` — the inner scrollable container's `flex-1` only took effect at `md:` and up, so below that breakpoint the container grew to fit all its content instead of staying bounded, and its own `overflow-y-auto` had nothing to scroll. Fixed by making the shell `flex flex-col md:flex-row` unconditionally.
+
+**Milestone 4 — Charts & Statistics (done 2026-07-07):**
+- Backend `/stats?range=week|month|year` (already scaffolded since Milestone 1) got its first dedicated test coverage — exact aggregation math per range, invalid-range rejection, cross-user isolation
+- Dashboard landing page chart-ified in place, per DD_v1.pdf's own layout: Weekly Hours (bar chart), Top Topics (ranked horizontal bar chart, replacing the old plain list), Completion % (a radial "meter," not a pie — a single ratio against a limit isn't a 2-slice-pie job)
+- New dedicated Statistics page (`/stats`) with a Weekly/Monthly/Yearly toggle (range lives in the URL, same shareable-link convention as the Learning page's tabs) driving one area chart
+- New `components/charts/` (ChartTooltip, WeeklyHoursChart, TopTopicsChart, CompletionMeter, HoursTrendChart) and a shared `components/StatCard.tsx` (extracted from Dashboard, now reused on Profile too)
+- Recharts added as a new dependency
+
+**Milestone 5 — Polish & Cross-Device QA (done 2026-07-07):**
+- Audited every page's loading/error/empty-state coverage; found and fixed one real gap (ProfilePage's dashboard/heatmap queries had no loading skeleton or error message)
+- Color contrast audit: computed WCAG ratios for every semantic token pair; found success-green and warning-orange both fail AA contrast when used as literal text (they were designed for icon fills, then reused for text too) — added `--success-text`/`--warning-text` (darker steps of the same hue, each verified ≥4.5:1) for the handful of actual-text usages, leaving icon fills on the original vibrant tokens
+- Cross-device QA pass (Playwright driving the real dev server at phone/tablet/laptop widths, substituting for literal physical-device testing, which isn't possible in this environment): found and fixed two real mobile layout bugs — the Learning page's search bar shrinking to an illegible sliver instead of wrapping, and the Study Sessions page's header buttons overflowing off-screen instead of wrapping
+- Final QA against DD_v1.pdf §17 Success Criteria: all 6 criteria confirmed substantively met against the current build (the "feels fast/inviting/pleasant" criterion is inherently qualitative, not a strict pass/fail, but is well-supported by the accumulated design/gamification/sharing work)
 
 ## Next Milestone
-Milestone 4 — `/stats` wired into Recharts (weekly hours, monthly hours, top topics, completion %), animated, responsive.
+Milestone 6 — Deployment & Pilot Rollout: Dockerfiles + docker-compose, managed Postgres provisioning, persistent object storage for uploads (currently local-disk), production secrets/CORS, HTTPS, basic structured logging, pilot account distribution.
 
 ## Known Issues
 - **Resolved 2026-07-07, but caused real data loss beforehand:** the test suite was silently truncating the live dev database on every run (see ADR-023). A user's account and all its data were wiped as a result. Test/dev database isolation is now structurally enforced — see `docs/DECISIONS.md` ADR-023 — but the specific data lost before the fix is unrecoverable; the account needs to be recreated.
@@ -88,8 +100,9 @@ Milestone 4 — `/stats` wired into Recharts (weekly hours, monthly hours, top t
 - Public profile route (`GET /public/profiles/:username`) is rate-limited (30/15min) but otherwise has no bot/scraper defense (no CAPTCHA, no robots.txt directive) — acceptable at pilot scale, worth revisiting before any real public launch.
 - No username availability check as the user types — they only find out it's taken on Save. A live-check endpoint would be a nice follow-up, not implemented now.
 - **Note image uploads are stored on local disk** (`/uploads`, ADR-022) — must move to persistent object storage before any deploy to a host without a persistent filesystem. The static serving route is also intentionally unauthenticated (browsers don't send auth headers on `<img>` requests); protected only by unguessable filenames, not real access control.
-- The post-M3 UX pass above was verified via clean backend build/vet/test (including new Go tests), clean frontend build/lint, and full Postman/Newman regression (including live curl end-to-end proof of the upload endpoint) — but not via independent browser-automation click-through (same tooling gap as M2/M3). The notes editor's cursor-insertion mechanics and the notes dialog's internal scroll behavior with a genuinely long note are the two areas most worth a manual click-test before calling this pass fully done.
-- Milestones 2 and 3's UI were verified via clean typecheck/build/lint, a manual API-contract cross-check between frontend services and backend DTOs, and (for M2) real backend request logs proving a live register→me→dashboard flow succeeded — but not via independent browser-automation click-through in this pass (headless browser tooling wasn't set up; the user declined installing it for now). Recommend a manual spot-check of the full click-through flow (and responsive breakpoints) before Milestone 5's dedicated cross-device QA pass.
+- **Resolved 2026-07-07:** the long-standing "no independent browser-automation click-through" gap noted for M2/M3/M4 below is now closed for Dashboard, Statistics, Profile, Learning, Study Sessions, and Trash — a Playwright script driving the actual running dev server (no `chromium-cli` available in this environment; installed the `playwright` npm package directly) verified each at phone (~390px), tablet (~768px), and laptop (~1400px) widths, seeded with real per-user data. This is what caught the mobile scroll bug, the Profile grid-overflow bug, and the two header/search-bar overflow bugs documented above — not something a build/lint check alone would surface.
+- Dense in-page icon buttons (tree row actions menu, note indicator, status toggle) are 24-32px, under the 44px tap-target convention — a deliberate, consistent pattern across the whole tree UI (matching common practice for information-dense hierarchical lists, e.g. VS Code's sidebar or GitHub's file tree), not an oversight. Primary/standalone controls (bottom tab bar, floating add button) do meet 44px. Revisit only if real pilot usage surfaces mis-taps, not preemptively.
+- Milestones 2 and 3's UI were verified via clean typecheck/build/lint, a manual API-contract cross-check between frontend services and backend DTOs, and (for M2) real backend request logs proving a live register→me→dashboard flow succeeded — but not via independent browser-automation click-through in that pass (headless browser tooling wasn't set up at the time). Superseded by the M5 cross-device QA pass above for the pages it covered; Study Sessions' notes-editor-specific interactions (cursor-insertion mechanics, long-note internal scroll) remain the areas most worth a manual spot-check.
 
 ## Project Health
-🟢 Green — Milestones 1-3 complete plus a substantial UX pass. No blockers for Milestone 4.
+🟢 Green — Milestones 1-5 complete. Not deployment-ready: Milestone 6 (containerization, managed Postgres, persistent object storage, production secrets/CORS, HTTPS) hasn't started. No blockers identified for it.

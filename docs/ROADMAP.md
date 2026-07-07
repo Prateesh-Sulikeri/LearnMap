@@ -36,20 +36,22 @@
 - Recycle bin (`/items/trash`, restore), top-down org-chart tree view + Active/Completed tabs on the Learning page, full markdown notes with device image upload + auto-generated table of contents, shareable Profile stat card exportable as an image
 - Driven directly by the user testing the running Milestone-3 build; see `PROJECT_STATUS.md` and ADR-022 for detail
 
+**Milestone 4 — Charts & Statistics** (completed 2026-07-07)
+- `/stats?range=week|month|year` (scaffolded since Milestone 1, first dedicated test coverage added now): exact aggregation math per range, invalid-range rejection, cross-user isolation
+- Dashboard landing page chart-ified per DD_v1.pdf's own layout: Weekly Hours (bar), Top Topics (ranked horizontal bar, replacing the plain list), Completion % (a radial meter — a single ratio against a limit isn't a pie-chart job)
+- New dedicated Statistics page (`/stats`) with a Weekly/Monthly/Yearly toggle (range lives in the URL) driving one area chart; new nav entry
+- Recharts added; new `components/charts/` + shared `components/StatCard.tsx`
+- Exit criteria met: charts render live per-user data (verified via curl math checks and Playwright screenshots), animate on load (Recharts default), responsive at phone/tablet/laptop (verified via Playwright)
+
+**Milestone 5 — Polish & Cross-Device QA** (completed 2026-07-07)
+- Audited empty/loading/error states on every page; fixed the one real gap found (ProfilePage's dashboard/heatmap queries)
+- Color-contrast audit (computed WCAG ratios for every semantic token pair): found and fixed success-green/warning-orange failing AA as text (they were designed for icon fills, reused for text too) — added `--success-text`/`--warning-text`, left icons on the original tokens
+- Cross-device QA: real physical-device testing isn't possible in this environment — substituted with Playwright driving the live dev server at phone/tablet/laptop widths across every page. Found and fixed three real layout bugs this way: an app-wide scroll bug below the `md` breakpoint (the shell's `md:flex` meant the scrollable container's `flex-1` never took effect below 768px), a CSS Grid overflow on Profile (an unwrappable URL forcing the grid wider than the viewport), and two header/search-bar overflow bugs (Learning, Study Sessions)
+- Final QA against DD_v1 §17 Success Criteria: all 6 confirmed substantively met against the current build
+
 ## Current Milestone
 
-**Milestone 4 — Charts & Statistics** (not started)
-- `/stats` endpoint (weekly/monthly/yearly aggregation), scoped per user
-- Recharts: weekly hours, monthly hours, top topics, completion %
-- Exit criteria: charts render live per-user data, animate on load, responsive at all breakpoints
-
-### Milestone 5 — Polish & Cross-Device QA
-- Empty/loading/error states, micro-interactions (150–200ms)
-- Real-device testing (actual phone browser + laptop browser, not just devtools emulation)
-- Accessibility pass on tap targets/contrast, including auth/profile screens
-- Final QA against DD_v1 §17 Success Criteria
-
-### Milestone 6 — Deployment & Pilot Rollout
+### Milestone 6 — Deployment & Pilot Rollout (not started — **the project is not deployment-ready**)
 - Dockerfiles (backend multi-stage build) + `docker-compose.yml` for local dev parity (Postgres + backend + frontend)
 - Provision managed Postgres; deploy backend container and frontend static build
 - Custom domain / HTTPS, CORS allow-list for the real deployed origin(s), production secrets (`JWT_SECRET`, `DATABASE_URL`, invite code)
