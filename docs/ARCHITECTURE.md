@@ -47,10 +47,11 @@ internal/
   services/                  ALL business logic lives here — owned by backend-agent
     auth_service.go            (register/login/refresh/logout, bcrypt, JWT)
     profile_service.go
-    learning_item_service.go   (hierarchy validation, cascade soft-delete, status transitions)
+    learning_item_service.go   (hierarchy validation, cascade soft-delete, status transitions, trash list/restore)
     study_session_service.go   (session CRUD, streak calc)
     dashboard_service.go       (aggregation: weekly hours, completion %, top topics)
     event_service.go           (append-only event log writer)
+    upload_service.go          (image uploads for notes — local disk, see ADR-022)
 
   handlers/                  HTTP only: parse request → call service → write response
     auth_handler.go
@@ -58,6 +59,7 @@ internal/
     learning_item_handler.go
     study_session_handler.go
     dashboard_handler.go
+    upload_handler.go
     health_handler.go
 
   routes/
@@ -85,21 +87,32 @@ Key dependencies (Milestone 1): `gin-gonic/gin`, `gorm.io/gorm` + `gorm.io/drive
 
 ```
 frontend/src/
-  components/        reusable UI primitives (Card, StatTile, TreeNode, ConfirmDialog, EmptyState...)
-  pages/              Login, Register, Dashboard, LearningTree, StudySessions, Profile
-  layouts/            AppLayout (nav + search bar + breadcrumb + floating add button); AuthLayout
+  components/
+    tree/              TreeNode (editable indented list) + TreeGuides (connector lines), OrgChartTree/
+                       OrgChartNode (top-down org-chart view), NoteIndicator (notes trigger button)
+    notes/             NotesEditorDialog (markdown + toolbar + preview + TOC), MarkdownToolbar,
+                       MarkdownPreview
+    profile/           ProfileStatCard (shareable stat card, exported as PNG via html-to-image)
+    ItemFormDialog, DeleteItemDialog, AddSessionDialog, DeleteSessionDialog — CRUD dialogs
+  pages/              Login, Register, Dashboard, LearningTree, StudySessions, Profile, Trash
+  layouts/            AppLayout (nav + breadcrumb + floating add button); AuthLayout
   routes/              route table incl. a ProtectedRoute wrapper (redirect to /login if unauthenticated)
-  hooks/               useAuth, useLearningTree, useDashboard, useStreak, useCollapsedState (localStorage)
+  hooks/               useAuth, useLearningTree, useCollapsedState/useSidebarCollapsed/useTreeViewMode (localStorage)
   services/            one file per API resource; TanStack Query hooks + Axios calls live here ONLY
     authApi.ts          register/login/refresh/logout/me — manages access token in memory
-    itemsApi.ts
+    itemsApi.ts          also list/restore trash
     sessionsApi.ts
     dashboardApi.ts
     profileApi.ts
-    client.ts            axios instance: attaches Bearer token, `withCredentials: true` for the refresh cookie, 401 → single silent refresh attempt → else logout
+    uploadsApi.ts        image upload for notes (multipart)
+    client.ts            axios instance: attaches Bearer token, `withCredentials: true` for the refresh cookie, 401 → single silent refresh attempt → else logout; exports API_ORIGIN for resolving root-relative upload URLs
   types/               shared TS types mirroring the API contract
-  utils/               pure helpers (date formatting, tree flatten/assemble, hours formatting)
+  utils/               pure helpers (tree assemble/search/findNodeById/completion-count, markdown-editing cursor helpers, ordinal date formatting)
 ```
+
+**Search is page-local, not global chrome.** Only the Learning page has anything to search, so the search input lives there, not in `AppLayout`'s header (an earlier version put it in the shared header for every page — removed once it became clear it was inert everywhere but Learning).
+
+**Notes editor is one shared dialog instance, not one per tree row.** `LearningTreePage` owns which item's notes are open (`notesItemId` state, resolved via `findNodeById`) and renders a single `NotesEditorDialog`; the per-row `NoteIndicator` is a thin trigger button. This is what lets the dialog's table-of-contents (for a root topic, auto-generated from its children) hand off to a different item's notes without any dialog-in-dialog nesting.
 
 **Responsive is a first-class requirement starting Milestone 2**, not deferred polish — every page must be verified at phone (~375–430px), tablet (~768px), and laptop (~1280px+) widths before being considered done.
 
@@ -203,6 +216,10 @@ Base path `/api/v1`. All routes except `auth/register`, `auth/login`, `auth/refr
 | DELETE | /sessions/:id                  | yes  | delete a session                          |
 | GET    | /dashboard                     | yes  | aggregate dashboard payload                |
 | GET    | /stats?range=week\|month\|year | yes  | chart data                                 |
+| GET    | /items/trash                    | yes  | list soft-deleted "trash roots" (ADR-003)  |
+| POST   | /items/:id/restore               | yes  | undo a soft-delete, cascades like Delete   |
+| POST   | /uploads                          | yes  | upload an image (for notes), returns a URL |
+| GET    | /uploads/*filepath                | none | serves uploaded images (see ADR-022)       |
 | GET    | /health                         | none | liveness/readiness check                  |
 
 Full request/response field detail: see the Lead Engineer's plan messages (2026-07-06). Error shape: `{ "error": { "code", "message", "fields"? } }`.
@@ -261,9 +278,14 @@ Rationale for no caching: each user's dataset is tiny (dozens–hundreds of rows
 
 **Client-side cache isolation:** the frontend's TanStack Query cache is process memory, not per-user. On logout (or a failed silent-refresh), the frontend calls `queryClient.clear()` before redirecting to `/login` — otherwise a second person logging into the same shared browser could briefly see the previous user's cached dashboard/tree data.
 
-## 10. Major Design Changes
+## 10. Note image uploads — local disk (ADR-022)
+
+`POST /uploads` stores uploaded images on local disk under `<UPLOAD_DIR>/<user_id>/<uuid>.<ext>`, served back via an **unauthenticated** static route (`router.Static("/uploads", ...)`, registered outside the auth middleware group — `<img src>` tags don't carry an `Authorization` header). Validation: real byte-sniffing via `http.DetectContentType` against a whitelist (JPEG/PNG/GIF/WebP — SVG deliberately excluded, script-injection risk), a size cap enforced both via `http.MaxBytesReader` before parsing and again after, and a fully server-generated filename (never the client's). See ADR-022 for the full trade-off — **this is local disk, which does not survive a redeploy on an ephemeral-filesystem host; it must move to persistent object storage (e.g. S3-compatible) before any such production deploy.**
+
+## 11. Major Design Changes
 
 - **2026-07-06**: Scope changed from local single-user SQLite tool to hosted multi-user app with auth/profiles. Database engine changed SQLite → PostgreSQL. Added `users`, `refresh_tokens` tables and `user_id` scoping across all data tables. Added Deployment Agent and deployment milestone. Elevated responsive design to a Milestone-2 requirement. See ADR-007 through ADR-014 in `docs/DECISIONS.md`.
 - **2026-07-06**: Clarified per-user request-scoping flow and dashboard computation strategy (sections 8-9 above) in response to a direct question. Changed cross-user access response from 403 to 404 (ADR-016). Documented no-caching rationale for dashboard stats (ADR-015) and added a mandatory `queryClient.clear()` on logout (client cache isolation between users on a shared device).
 - **2026-07-06**: Phase 2 AI-readiness architecture (§7) and AWS pilot hosting topology (§6) added in response to a scalability question, ADR-017 through ADR-021 — no code, architecture placeholders only.
 - **2026-07-06**: Milestone 1 (Backend Foundation + Auth) implemented, tested, and reviewed. Two review-driven fixes applied before sign-off: (1) `EventService.Record` now logs failures instead of silently discarding them — a swallowed audit-log write would quietly undermine the event table's whole purpose; (2) `handlers.RespondError` matches service errors via `errors.As` instead of a direct type assertion, for robustness against wrapped errors. Actual folder structure ended up with two packages not in the original plan: `internal/apperror` (typed service errors) and `internal/testutil` (real-Postgres test helper) — both are small, load-bearing, and consistent with the layering rules already established, not scope creep.
+- **2026-07-07**: Post-Milestone-3 UX/feature pass, driven directly by the user testing the running app rather than by a new milestone plan. Added: a recycle bin (`GET /items/trash`, `POST /items/:id/restore`, mirroring Delete's cascade); a top-down org-chart view of the learning map (`OrgChartTree`/`OrgChartNode`) as an alternative to the indented list, toggled per-user preference, with an Active/Completed tab split on top-level topics; a full notes feature (markdown + toolbar + live preview, images uploaded from the device via the new local-disk-backed `/uploads` endpoint — ADR-022 — and an auto-generated table of contents for root topics that hands off between items' notes); a shareable Profile stat card exportable as a PNG. Removed the global search bar from `AppLayout` (dead chrome everywhere except Learning) in favor of a page-local one. None of this was scoped in the original Milestone 4-6 plan; it's UX polish requested directly against the running Milestone-3 build, applied without deferring to a formal milestone boundary since the user explicitly prioritized it over starting Milestone 4.

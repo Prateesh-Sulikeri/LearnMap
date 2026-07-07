@@ -8,6 +8,7 @@ frontend/.env.*.local
 backend/tmp/
 backend/*.exe
 backend/*.test
+backend/uploads/
 
 # Editor / OS
 .DS_Store

@@ -1,0 +1,92 @@
+/* Scoped styles for rendered note markdown — reuses this app's own design
+   tokens rather than pulling in @tailwindcss/typography, whose opinionated
+   `prose` classes would fight the custom palette/radius/font tokens already
+   defined in index.css. */
+
+.md-preview {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--foreground);
+  overflow-wrap: break-word;
+}
+
+.md-preview > *:first-child {
+  margin-top: 0;
+}
+
+.md-preview h1,
+.md-preview h2,
+.md-preview h3 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+}
+
+.md-preview h1 {
+  font-size: 1.375rem;
+}
+
+.md-preview h2 {
+  font-size: 1.125rem;
+}
+
+.md-preview h3 {
+  font-size: 1rem;
+}
+
+.md-preview p {
+  margin: 0.75em 0;
+}
+
+.md-preview ul,
+.md-preview ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.md-preview li {
+  margin: 0.25em 0;
+}
+
+.md-preview code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 0.15em 0.4em;
+}
+
+.md-preview pre {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--muted);
+  border-radius: var(--radius-md);
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.md-preview pre code {
+  background: none;
+  padding: 0;
+}
+
+.md-preview img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  margin: 0.75em 0;
+}
+
+.md-preview blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  margin: 0.75em 0;
+  color: var(--muted-foreground);
+}
+
+.md-preview a {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

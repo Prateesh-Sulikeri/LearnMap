@@ -280,6 +280,20 @@
 
 ---
 
+## ADR-022: Note images stored on local disk, served unauthenticated
+
+**Decision:** `POST /uploads` writes uploaded images to local disk (`<UPLOAD_DIR>/<user_id>/<uuid>.<ext>`) and serves them back via `router.Static("/uploads", ...)`, registered outside the auth-middleware group.
+
+**Context:** The user asked for notes to support images uploaded from the device (not just pasted URLs), and no object-storage infrastructure exists anywhere in this project yet.
+
+**Alternatives considered:** Object storage (S3-compatible) from day one; requiring the static route to sit behind auth.
+
+**Reasoning:** Local disk is the simplest thing that works today and needs zero new infrastructure/credentials for a pilot-stage app; the URL returned to the client is root-relative (`/uploads/...`), not baked with a domain, so switching the storage backend later doesn't require rewriting already-saved note text. The static route can't require auth because `<img src>` tags issued by the browser carry no `Authorization` header — the trade-off (anyone who obtains a URL can view that image; protected only by an unguessable UUID filename, not real access control) is accepted explicitly, the same trust model already used for the pilot's invite-code gate. **This must move to persistent object storage before any production deploy to a host without a persistent filesystem** — local disk does not survive a redeploy on most such platforms.
+
+**Status:** Approved (pilot/MVP scope) — revisit before Milestone 6 deployment if the chosen host doesn't have a persistent volume.
+
+---
+
 ## ADR-021: Pilot hosting on AWS free tier — concrete topology
 
 **Decision:** For the pilot, run the Dockerized backend and a containerized Postgres together on a single small EC2 instance (free-tier eligible), with the frontend static build on S3+CloudFront (or Vercel/Netlify — either is free and equally simple). This resolves ADR-014's previously-open "which provider" question for the pilot phase specifically.

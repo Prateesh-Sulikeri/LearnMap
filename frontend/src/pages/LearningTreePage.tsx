@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CircleCheck, List, ListTree, Search, Trash2, Workflow } from 'lucide-react'
+import { Circle, CircleCheck, List, ListTree, Search, Trash2, Workflow } from 'lucide-react'
 import { useLearningTree } from '@/hooks/useLearningTree'
 import { useCollapsedState } from '@/hooks/useCollapsedState'
 import { useTreeViewMode } from '@/hooks/useTreeViewMode'
-import { nodeMatchesSearch } from '@/utils/tree'
+import { findNodeById, nodeMatchesSearch } from '@/utils/tree'
 import { TreeNode } from '@/components/TreeNode'
 import { OrgChartTree } from '@/components/tree/OrgChartTree'
+import { NotesEditorDialog } from '@/components/notes/NotesEditorDialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -19,8 +20,14 @@ export default function LearningTreePage() {
   const [tab, setTab] = useState<MapTab>('active')
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useTreeViewMode()
+  const [notesItemId, setNotesItemId] = useState<string | null>(null)
   const { tree, isLoading, isError } = useLearningTree()
   const { isCollapsed, toggle } = useCollapsedState()
+
+  // A single shared dialog instance, not one per tree row — lets a
+  // table-of-contents entry inside the dialog hand off to a different
+  // item's notes without any dialog-in-dialog nesting.
+  const notesNode = notesItemId ? findNodeById(tree, notesItemId) : null
 
   if (isLoading) {
     return (
@@ -65,6 +72,7 @@ export default function LearningTreePage() {
           className={cn('gap-1.5', tab === 'active' && 'bg-accent text-accent-foreground')}
           onClick={() => setTab('active')}
         >
+          <Circle className="size-4" />
           Active
         </Button>
         <Button
@@ -146,14 +154,21 @@ export default function LearningTreePage() {
               depth={0}
               isCollapsed={isCollapsed}
               onToggle={toggle}
+              onOpenNotes={setNotesItemId}
               isLast={index === visibleTree.length - 1}
               ancestorLines={[]}
             />
           ))}
         </ul>
       ) : (
-        <OrgChartTree tree={visibleTree} isCollapsed={isCollapsed} onToggle={toggle} />
+        <OrgChartTree tree={visibleTree} isCollapsed={isCollapsed} onToggle={toggle} onOpenNotes={setNotesItemId} />
       )}
+
+      <NotesEditorDialog
+        node={notesNode}
+        onOpenChange={(open) => !open && setNotesItemId(null)}
+        onNavigate={setNotesItemId}
+      />
     </div>
   )
 }

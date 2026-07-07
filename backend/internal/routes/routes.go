@@ -15,6 +15,8 @@ type Dependencies struct {
 	ItemHandler        *handlers.LearningItemHandler
 	SessionHandler     *handlers.StudySessionHandler
 	DashboardHandler   *handlers.DashboardHandler
+	UploadHandler      *handlers.UploadHandler
+	UploadDir          string
 	CORSAllowedOrigins []string
 }
 
@@ -27,6 +29,12 @@ func Register(router *gin.Engine, deps Dependencies) {
 	router.Use(middleware.CORS(deps.CORSAllowedOrigins))
 
 	router.GET("/health", handlers.Health)
+
+	// Public (unauthenticated) static file serving — <img> tags issued by the
+	// browser don't carry an Authorization header, so this can't sit behind
+	// the auth middleware. Mitigated by unguessable per-file UUID filenames,
+	// the same trust model already accepted elsewhere in this pilot-scale MVP.
+	router.Static("/uploads", deps.UploadDir)
 
 	api := router.Group("/api/v1")
 
@@ -58,5 +66,7 @@ func Register(router *gin.Engine, deps Dependencies) {
 
 		protected.GET("/dashboard", deps.DashboardHandler.GetDashboard)
 		protected.GET("/stats", deps.DashboardHandler.GetStats)
+
+		protected.POST("/uploads", middleware.RateLimit(20, 10), deps.UploadHandler.Upload)
 	}
 }

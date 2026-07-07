@@ -25,6 +25,8 @@ interface TreeNodeProps {
   depth: number
   isCollapsed: (id: string) => boolean
   onToggle: (id: string) => void
+  /** Opens the shared, page-level notes editor for the given item id. */
+  onOpenNotes: (id: string) => void
   /** Whether this node is the last child among its siblings (see TreeGuides). */
   isLast: boolean
   /** Ancestor continuation guides inherited from the parent (see TreeGuides). */
@@ -36,7 +38,7 @@ interface TreeNodeProps {
 // horizontal space — the "adapted interaction pattern for narrow screens"
 // the roadmap calls for on this page. Connector guide lines (TreeGuides)
 // give the nesting an actual visual tree structure, not just indentation.
-export function TreeNode({ node, depth, isCollapsed, onToggle, isLast, ancestorLines }: TreeNodeProps) {
+export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, isLast, ancestorLines }: TreeNodeProps) {
   const hasChildren = node.children.length > 0
   const collapsed = isCollapsed(node.id)
   const completed = node.status === 'completed'
@@ -105,7 +107,7 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, isLast, ancestorL
           >
             {node.title}
           </button>
-          {node.description && <NoteIndicator itemId={node.id} note={node.description} />}
+          <NoteIndicator note={node.description} onClick={() => onOpenNotes(node.id)} />
         </div>
 
         <Tooltip>
@@ -151,6 +153,7 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, isLast, ancestorL
               depth={depth + 1}
               isCollapsed={isCollapsed}
               onToggle={onToggle}
+              onOpenNotes={onOpenNotes}
               isLast={index === node.children.length - 1}
               ancestorLines={[...ancestorLines, !isLast]}
             />

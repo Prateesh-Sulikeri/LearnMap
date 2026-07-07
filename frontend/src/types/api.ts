@@ -67,6 +67,10 @@ export interface DeleteItemResponse {
   deleted_count: number
 }
 
+export interface UploadImageResponse {
+  url: string
+}
+
 export interface TrashedItem {
   id: string
   parent_id: string | null

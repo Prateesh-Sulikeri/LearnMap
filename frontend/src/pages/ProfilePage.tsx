@@ -1,15 +1,18 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { profileApi } from '@/services/profileApi'
+import { dashboardApi } from '@/services/dashboardApi'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { formatOrdinalDate } from '@/utils/date'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ProfileStatCard } from '@/components/profile/ProfileStatCard'
 
 const profileFormSchema = z.object({
   displayName: z.string().min(1, 'Tell us what to call you'),
@@ -31,6 +34,7 @@ type PasswordFormValues = z.infer<typeof passwordFormSchema>
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
+  const { data: dashboard } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -63,11 +67,13 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
+      <ProfileStatCard user={user} dashboard={dashboard} />
+
       <Card>
         <CardHeader>
           <CardTitle className="font-heading">Profile</CardTitle>
           <CardDescription>
-            {user.email} · joined {new Date(user.created_at).toLocaleDateString()}
+            {user.email} · Joined {formatOrdinalDate(user.created_at)}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -86,6 +92,10 @@ export default function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="profile-avatar-url">Avatar URL</Label>
               <Input id="profile-avatar-url" placeholder="https://…" {...profileForm.register('avatarUrl')} />
+              <p className="text-xs text-muted-foreground">
+                A link to an image already hosted somewhere (e.g. Gravatar) — shown on your stat card above and in
+                the sidebar.
+              </p>
               {profileForm.formState.errors.avatarUrl && (
                 <p className="text-sm text-destructive">{profileForm.formState.errors.avatarUrl.message}</p>
               )}

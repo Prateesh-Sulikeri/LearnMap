@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"learnmap-backend/internal/config"
 	"learnmap-backend/internal/database"
@@ -27,6 +28,10 @@ func main() {
 	}
 	log.Println("migrations applied")
 
+	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
+		log.Fatalf("upload dir error: %v", err)
+	}
+
 	db, err := database.Connect(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("db connection error: %v", err)
@@ -44,12 +49,14 @@ func main() {
 	itemService := services.NewLearningItemService(itemRepo, eventService)
 	sessionService := services.NewStudySessionService(sessionRepo, itemRepo, eventService)
 	dashboardService := services.NewDashboardService(sessionRepo, itemRepo)
+	uploadService := services.NewUploadService(cfg.UploadDir, cfg.MaxUploadSizeMB)
 
 	authHandler := handlers.NewAuthHandler(authService, cfg.RefreshCookieName, cfg.RefreshCookieDomain, cfg.RefreshCookieSecure, cfg.RefreshTokenTTL)
 	profileHandler := handlers.NewProfileHandler(profileService)
 	itemHandler := handlers.NewLearningItemHandler(itemService)
 	sessionHandler := handlers.NewStudySessionHandler(sessionService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
+	uploadHandler := handlers.NewUploadHandler(uploadService)
 
 	router := gin.New()
 	routes.Register(router, routes.Dependencies{
@@ -59,6 +66,8 @@ func main() {
 		ItemHandler:        itemHandler,
 		SessionHandler:     sessionHandler,
 		DashboardHandler:   dashboardHandler,
+		UploadHandler:      uploadHandler,
+		UploadDir:          cfg.UploadDir,
 		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
 	})
 

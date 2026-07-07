@@ -38,6 +38,16 @@ export function nodeMatchesSearch(node: LearningTreeNode, query: string): boolea
   return node.children.some((child) => nodeMatchesSearch(child, trimmed))
 }
 
+/** Depth-first search for a node by id across a forest — used to resolve which item the notes dialog is currently showing. */
+export function findNodeById(roots: LearningTreeNode[], id: string): LearningTreeNode | null {
+  for (const node of roots) {
+    if (node.id === id) return node
+    const found = findNodeById(node.children, id)
+    if (found) return found
+  }
+  return null
+}
+
 export interface CompletionCount {
   completed: number
   total: number

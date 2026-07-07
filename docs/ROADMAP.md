@@ -32,6 +32,10 @@
 - Dashboard wired to live `/dashboard` data: stat cards, top topics, today's sessions, recent activity
 - Exit criteria: build/typecheck/lint clean; API contract cross-checked field-by-field against the backend DTOs. Full click-through (create→track→complete→log-session, two-account isolation) not independently re-verified via browser automation in this pass — same tooling gap as Milestone 2, flagged for a spot-check before Milestone 5.
 
+**Post-Milestone-3 UX/feature pass** (completed 2026-07-07, interstitial — not a numbered milestone)
+- Recycle bin (`/items/trash`, restore), top-down org-chart tree view + Active/Completed tabs on the Learning page, full markdown notes with device image upload + auto-generated table of contents, shareable Profile stat card exportable as an image
+- Driven directly by the user testing the running Milestone-3 build; see `PROJECT_STATUS.md` and ADR-022 for detail
+
 ## Current Milestone
 
 **Milestone 4 — Charts & Statistics** (not started)
@@ -64,8 +68,9 @@
 The `events` table, per-user scoping, and the AI seam/job-queue/usage-tracking groundwork (ADR-017–020) all exist specifically so these can be built later without an architectural rewrite. None are scheduled or scoped yet.
 
 ### Other deferred ideas
-- Note editor, native mobile app
+- Native mobile app
 - Collaboration/shared workspaces between users (each pilot tester's data stays private to them)
 - OAuth/social login, email verification, "forgot password" email flow (defer past pilot — manual reset by admin if needed during pilot)
 - Drag-and-drop manual reordering (schema has a `position` column reserved for this)
-- Avatar file upload (MVP profile uses a URL field, not blob storage)
+- Avatar file upload (profile still uses a URL field; notes gained device image upload during the post-M3 pass — see ADR-022 — but that storage is local-disk, not yet reused for avatars)
+- Syntax highlighting / GFM tables in the notes markdown editor (plain CommonMark only for now — see ADR/ARCHITECTURE notes on the notes editor)

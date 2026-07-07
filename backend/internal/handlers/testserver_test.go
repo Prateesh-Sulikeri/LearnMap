@@ -39,12 +39,15 @@ func newTestRouter(t *testing.T) *gin.Engine {
 	itemService := services.NewLearningItemService(itemRepo, eventService)
 	sessionService := services.NewStudySessionService(sessionRepo, itemRepo, eventService)
 	dashboardService := services.NewDashboardService(sessionRepo, itemRepo)
+	uploadDir := t.TempDir()
+	uploadService := services.NewUploadService(uploadDir, 5)
 
 	authHandler := handlers.NewAuthHandler(authService, "refresh_token", "", false, 30*24*time.Hour)
 	profileHandler := handlers.NewProfileHandler(profileService)
 	itemHandler := handlers.NewLearningItemHandler(itemService)
 	sessionHandler := handlers.NewStudySessionHandler(sessionService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
+	uploadHandler := handlers.NewUploadHandler(uploadService)
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -55,6 +58,8 @@ func newTestRouter(t *testing.T) *gin.Engine {
 		ItemHandler:        itemHandler,
 		SessionHandler:     sessionHandler,
 		DashboardHandler:   dashboardHandler,
+		UploadHandler:      uploadHandler,
+		UploadDir:          uploadDir,
 		CORSAllowedOrigins: []string{"http://localhost:5173"},
 	})
 	return router

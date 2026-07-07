@@ -19,6 +19,8 @@ type Config struct {
 	RefreshCookieName   string
 	RefreshCookieDomain string
 	RefreshCookieSecure bool
+	UploadDir           string
+	MaxUploadSizeMB     int
 }
 
 func Load() (*Config, error) {
@@ -30,6 +32,7 @@ func Load() (*Config, error) {
 		RefreshCookieName:   getEnv("REFRESH_COOKIE_NAME", "refresh_token"),
 		RefreshCookieDomain: os.Getenv("REFRESH_COOKIE_DOMAIN"),
 		RefreshCookieSecure: getEnv("REFRESH_COOKIE_SECURE", "true") == "true",
+		UploadDir:           getEnv("UPLOAD_DIR", "./uploads"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -55,6 +58,12 @@ func Load() (*Config, error) {
 	for _, o := range strings.Split(origins, ",") {
 		cfg.CORSAllowedOrigins = append(cfg.CORSAllowedOrigins, strings.TrimSpace(o))
 	}
+
+	maxUploadMB, err := strconv.Atoi(getEnv("MAX_UPLOAD_SIZE_MB", "5"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid MAX_UPLOAD_SIZE_MB: %w", err)
+	}
+	cfg.MaxUploadSizeMB = maxUploadMB
 
 	return cfg, nil
 }

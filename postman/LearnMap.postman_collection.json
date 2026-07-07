@@ -609,6 +609,59 @@
       ]
     },
     {
+      "name": "Uploads (Alice)",
+      "item": [
+        {
+          "name": "Upload Image (for notes)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('returns a /uploads/ url', () => pm.expect(pm.response.json().url).to.match(/^\\/uploads\\//));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": "fixtures/test-image.png" }]
+            },
+            "url": { "raw": "{{base_url}}/api/v1/uploads", "host": ["{{base_url}}"], "path": ["api", "v1", "uploads"] },
+            "description": "Requires Postman/Newman to be run with this collection's directory as the working directory so the relative fixture path resolves — already verified end to end via curl during development."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Non-Image (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status is 400', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": "LearnMap.postman_collection.json" }]
+            },
+            "url": { "raw": "{{base_url}}/api/v1/uploads", "host": ["{{base_url}}"], "path": ["api", "v1", "uploads"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Study Sessions (Alice)",
       "item": [
         {

@@ -111,8 +111,17 @@ export default function AppLayout() {
         </nav>
 
         <div className="mt-auto space-y-2 px-1">
-          {!sidebarCollapsed && (
-            <p className="truncate text-xs text-muted-foreground">Welcome back {user?.display_name}!</p>
+          {!sidebarCollapsed && user && (
+            <Link to="/profile" className="flex items-center gap-2 truncate text-xs text-muted-foreground hover:text-foreground">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="" className="size-6 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[0.6rem] font-semibold text-primary-foreground">
+                  {user.display_name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="truncate">{user.display_name}</span>
+            </Link>
           )}
           <Tooltip>
             <TooltipTrigger
@@ -164,14 +173,21 @@ export default function AppLayout() {
       </nav>
 
       {/* Floating add button — every page, per the design doc */}
-      <Button
-        size="icon"
-        className="fixed right-4 bottom-20 z-20 size-14 rounded-full shadow-lg transition-transform duration-150 hover:scale-105 md:right-8 md:bottom-8"
-        onClick={() => setQuickAddOpen(true)}
-        aria-label="Add learning item"
-      >
-        <Plus className="size-6" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size="icon"
+              className="fixed right-4 bottom-20 z-20 size-14 rounded-full shadow-lg transition-transform duration-150 hover:scale-105 md:right-8 md:bottom-8"
+              onClick={() => setQuickAddOpen(true)}
+              aria-label="Add learning item"
+            />
+          }
+        >
+          <Plus className="size-6" />
+        </TooltipTrigger>
+        <TooltipContent side="left">Add something to learn</TooltipContent>
+      </Tooltip>
 
       <ItemFormDialog open={quickAddOpen} onOpenChange={setQuickAddOpen} mode="create" />
     </div>

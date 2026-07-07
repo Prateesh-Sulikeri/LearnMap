@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Post-Milestone-3 UX/feature pass (2026-07-07)
+- Added a recycle bin: `GET /items/trash` and `POST /items/:id/restore` (mirrors Delete's cascade), a Trash page (`/trash`), and cache invalidation so deleting an item updates Trash without a manual refresh.
+- Added a top-down org-chart view of the Learning page (`OrgChartTree`), toggled per-user preference alongside the existing indented list — both fully editable. Added an Active/Completed tab split on top-level topics, and moved search from global `AppLayout` chrome to a page-local control (it was inert on every page but Learning).
+- Added a full notes feature: markdown + toolbar (bold/italic/H1/H2/code/image) with live preview in a large dialog; images upload from the device via a new `POST /uploads` endpoint (local disk storage — ADR-022); a root topic's notes auto-generate a table of contents from its sub-topics, each entry a hand-off to that sub-topic's own notes.
+- Added a shareable Profile stat card (streak, most-time-spent topic, avatar) exportable as a PNG (`html-to-image`); ordinal joined-date wording; avatar now actually renders (was a write-only field before).
+- Fixed: tree connector-line rendering bug and darkened the lines; org-chart horizontal scroll no longer expands the whole page layout (missing `min-w-0`); floating add button was missing a tooltip.
+- Added Go tests for the upload endpoint (valid image, non-image rejection, SVG exclusion, oversized rejection, auth-required) and for trash/restore cross-user isolation.
+- Added `backend/README.md` documenting exact local spin-up/restart/test steps.
+- Initialized git for the repository (previously untracked).
+
 ### Milestone 3 — Study Sessions, Task Management & Profile (2026-07-06)
 - Added item CRUD to the Learning Tree: add sub-item, rename, mark complete/reopen (status-toggle circle or actions menu), delete with a confirmation dialog that explains cascade behavior.
 - Added the Study Sessions page: table view, "Add Session" dialog with a topic picker sourced from the learning tree, delete with confirmation.

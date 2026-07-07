@@ -23,9 +23,10 @@ interface OrgChartNodeProps {
   node: LearningTreeNode
   isCollapsed: (id: string) => boolean
   onToggle: (id: string) => void
+  onOpenNotes: (id: string) => void
 }
 
-export function OrgChartNode({ node, isCollapsed, onToggle }: OrgChartNodeProps) {
+export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes }: OrgChartNodeProps) {
   const hasChildren = node.children.length > 0
   const collapsed = isCollapsed(node.id)
   const completed = node.status === 'completed'
@@ -71,7 +72,7 @@ export function OrgChartNode({ node, isCollapsed, onToggle }: OrgChartNodeProps)
           {node.title}
         </button>
 
-        {node.description && <NoteIndicator itemId={node.id} note={node.description} />}
+        <NoteIndicator note={node.description} onClick={() => onOpenNotes(node.id)} />
 
         {hasChildren && (
           <span className="font-mono text-xs text-muted-foreground">
@@ -100,7 +101,7 @@ export function OrgChartNode({ node, isCollapsed, onToggle }: OrgChartNodeProps)
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setRenameOpen(true)} className="flex items-center gap-3">
                   <Pencil className="size-4" />
-                  Rename / edit notes
+                  Rename
                 </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)} className="flex items-center gap-3">
                   <Trash2 className="size-4" />
@@ -127,7 +128,7 @@ export function OrgChartNode({ node, isCollapsed, onToggle }: OrgChartNodeProps)
       {hasChildren && !collapsed && (
         <ul>
           {node.children.map((child) => (
-            <OrgChartNode key={child.id} node={child} isCollapsed={isCollapsed} onToggle={onToggle} />
+            <OrgChartNode key={child.id} node={child} isCollapsed={isCollapsed} onToggle={onToggle} onOpenNotes={onOpenNotes} />
           ))}
         </ul>
       )}

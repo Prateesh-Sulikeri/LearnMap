@@ -4,6 +4,11 @@ import { getAccessToken, setAccessToken } from './tokenStore'
 export const API_BASE_URL: string =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
 
+// The backend's origin with no path — used to resolve root-relative URLs
+// (e.g. uploaded image paths returned by POST /uploads) into absolute ones
+// for <img src>, since those aren't fetched through apiClient's baseURL.
+export const API_ORIGIN: string = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
+
 // The only Axios instance in the app — every service file goes through this,
 // per frontend-agent's charter ("never call axios/fetch directly from a
 // component"). withCredentials is required so the httpOnly refresh cookie
