@@ -18,8 +18,12 @@ func NewProfileHandler(service *services.ProfileService) *ProfileHandler {
 }
 
 type updateProfileRequest struct {
-	DisplayName *string `json:"display_name"`
-	AvatarURL   *string `json:"avatar_url"`
+	DisplayName *string           `json:"display_name"`
+	AvatarURL   *string           `json:"avatar_url"`
+	Username    *string           `json:"username"`
+	Bio         *string           `json:"bio"`
+	SocialLinks map[string]string `json:"social_links"`
+	IsPublic    *bool             `json:"is_public"`
 }
 
 type changePasswordRequest struct {
@@ -39,6 +43,10 @@ func (h *ProfileHandler) Update(c *gin.Context) {
 	user, err := h.service.UpdateProfile(userID, services.UpdateProfileInput{
 		DisplayName: req.DisplayName,
 		AvatarURL:   req.AvatarURL,
+		Username:    req.Username,
+		Bio:         req.Bio,
+		SocialLinks: req.SocialLinks,
+		IsPublic:    req.IsPublic,
 	})
 	if err != nil {
 		RespondError(c, err)

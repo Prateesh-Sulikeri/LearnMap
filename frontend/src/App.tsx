@@ -9,6 +9,7 @@ import LearningTreePage from '@/pages/LearningTreePage'
 import StudySessionsPage from '@/pages/StudySessionsPage'
 import ProfilePage from '@/pages/ProfilePage'
 import TrashPage from '@/pages/TrashPage'
+import PublicProfilePage from '@/pages/PublicProfilePage'
 
 export default function App() {
   return (
@@ -17,6 +18,8 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
+
+      <Route path="/u/:username" element={<PublicProfilePage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>

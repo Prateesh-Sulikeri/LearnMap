@@ -1,5 +1,19 @@
 # LearnMap.app — Architecture Decision Records
 
+## ADR-027: Username-based public profiles, public-by-default with an opt-out toggle
+
+**Decision:** Public profile sharing uses a user-chosen, unique username (`/u/<username>`), not the raw user ID. Profiles are public by default (`is_public = true` on creation) but can be toggled off in Profile settings. A user has no shareable link at all until they set a username — `IsPublic` defaults true independent of whether `Username` is set.
+
+**Context:** Asked directly (AskUserQuestion) rather than assumed, since both the URL scheme and the privacy default are hard to change later without breaking links or surprising users. The user chose a vanity username over the plain ID (more shareable, matches the "post this on your resume/bio" intent) and public-by-default-with-opt-out over private-by-default-opt-in.
+
+**Alternatives considered:** Raw user ID in the URL — simpler (no uniqueness/validation/schema work) but far less shareable, rejected in favor of a username. Private-by-default (opt-in) — safer default from a pure privacy standpoint, but explicitly not what was asked for.
+
+**Reasoning:** Usernames are normalized to lowercase on write (`ProfileService.UpdateProfile`) so a single plain unique index suffices — no case-insensitive collation or functional index needed, and no case-confusion between `/u/Alice` and `/u/alice`. The public endpoint (`GET /public/profiles/:username`) returns `NotFound` identically for "doesn't exist" and "exists but private" (ADR-016's existing "don't distinguish the reasons" rule extended to this new case) so a private profile can't be distinguished from a nonexistent one by a stranger probing usernames.
+
+**Status:** Approved and implemented (migration `000008`; `models.User`; `ProfileService.UpdateProfile`; `PublicProfileService`; `PublicProfileHandler`; frontend `PublicProfilePage.tsx`).
+
+---
+
 ## ADR-026: Trash retention enforced lazily on read, not a scheduled job
 
 **Decision:** Deleted items are permanently purged 7 days after deletion, checked and enforced inside `ListTrash` itself (on every call) rather than by a background job or cron.

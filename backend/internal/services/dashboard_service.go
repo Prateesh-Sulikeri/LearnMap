@@ -124,6 +124,19 @@ func (s *DashboardService) GetDashboard(userID uuid.UUID) (*Dashboard, error) {
 	}, nil
 }
 
+// GetHeatmap returns one point per day for the last 365 days (including
+// zero-hour days) — a GitHub-contribution-graph-style dataset, reused by
+// both the authenticated Profile page and the public profile view.
+func (s *DashboardService) GetHeatmap(userID uuid.UUID) ([]DailyHoursPoint, error) {
+	now := time.Now()
+	from := startOfDay(now).AddDate(0, 0, -364)
+	rows, err := s.sessions.DailyHoursSince(userID, from)
+	if err != nil {
+		return nil, err
+	}
+	return fillDailySeries(rows, from, now), nil
+}
+
 type StatsRange string
 
 const (
@@ -208,7 +221,8 @@ func fillDailySeries(rows []repositories.DailyHours, from, to time.Time) []Daily
 		byDate[r.Date.Format("2006-01-02")] = r.Hours
 	}
 
-	points := make([]DailyHoursPoint, 0, 7)
+	days := int(startOfDay(to).Sub(startOfDay(from)).Hours()/24) + 1
+	points := make([]DailyHoursPoint, 0, days)
 	for d := startOfDay(from); !d.After(startOfDay(to)); d = d.AddDate(0, 0, 1) {
 		key := d.Format("2006-01-02")
 		points = append(points, DailyHoursPoint{Date: key, Hours: byDate[key]})

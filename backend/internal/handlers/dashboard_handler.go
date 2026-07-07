@@ -72,3 +72,13 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"range": rangeParam, "points": stats})
 }
+
+func (h *DashboardHandler) GetHeatmap(c *gin.Context) {
+	userID := middleware.UserIDFromContext(c)
+	heatmap, err := h.service.GetHeatmap(userID)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"heatmap": heatmap})
+}

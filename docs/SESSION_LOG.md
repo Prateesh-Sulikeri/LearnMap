@@ -241,3 +241,39 @@ Drag-and-drop reordering (also mentioned in the same Todo, alongside "add sub-it
 **Problems encountered and resolved:** The stale-container issue above — worth remembering that every backend route/handler change needs `docker restart learnmap-backend` before it's actually live, not just a successful `go build`.
 
 **Next recommended task:** Milestone 4 (Charts & Statistics) remains the next planned formal milestone. No other open items from user feedback as of this entry.
+
+---
+
+## 2026-07-07 — Favs tab corrected: root-only, filter-not-flat-list
+
+**Summary:** Direct follow-up on the Favs tab just shipped: "The Fav should be only on the top topic, and it should carry over the entire topic along with its children nodes, also the Map, List view needs to be here too. Its more like we are implementing a filter on the Active page." Corrected both halves: (1) `SetFavorite` now rejects favoriting anything but a root item (`parent_id != nil`), and the star toggle only renders on root-level rows (`TreeNode`'s `depth === 0`, `OrgChartNode`'s new `isRoot` prop, set only by `OrgChartTree`'s top-level map); (2) Favs is now literally `tree.filter(node => node.is_favorite)` — the same shape as the Completed filter — reusing the exact same `TreeNode`/`OrgChartTree` rendering and List/Map toggle as every other tab, instead of the separate flat any-depth list component from the previous round. Deleted the now-unused `FavoritesList.tsx`.
+
+**Verification:** New backend test (`TestLearningItemService_SetFavorite_RejectsNonRootItem`) plus the full suite; frontend build/lint clean.
+
+**Files modified:** `backend/internal/services/learning_item_service{,_test}.go`; `frontend/src/components/{TreeNode,tree/OrgChartNode,tree/OrgChartTree}.tsx`, `frontend/src/pages/LearningTreePage.tsx`. Deleted `frontend/src/components/tree/FavoritesList.tsx`.
+
+**Next recommended task:** Same as before — Milestone 4 next up, no other open feedback.
+
+---
+
+## 2026-07-07 — Profile expansion (stage 1 of 3): heatmap, bio/socials, shareable public profiles
+
+**Summary:** A large combined request across Profile, Study Sessions, and Dashboard. Given the size — public profile sharing and a full calendar rewrite are both genuinely new architecture, not incremental UX — worked through it in stages rather than all at once, starting with Profile (self-contained, unblocks nothing else). Two decisions were asked directly (AskUserQuestion) before touching schema, since both are hard to walk back once real usernames/links exist: (1) public profile URLs use a chosen username (`/u/prateesh`), not the raw user ID; (2) profiles are public by default with an opt-out toggle, not private-by-default opt-in.
+
+Implemented:
+- `GET /profile/heatmap` — 365 days of daily study hours, reusing the existing `DailyHoursSince` repository query already used for the weekly dashboard chart; a new `ContributionHeatmap` component (custom CSS grid, no new dependency) renders it GitHub-commit-graph-style on the Profile page.
+- `users` gained `username` (nullable, unique — normalized to lowercase on write so a plain index suffices, no case-insensitive collation needed), `bio`, `social_links` (JSONB, keys restricted to a fixed platform list), `is_public` (migration `000008`).
+- `PublicProfileService`/`PublicProfileHandler` — a new unauthenticated `GET /public/profiles/:username`, deliberately separate from the auth-scoped `ProfileService`/`DashboardService`: returns only what's safe to show a stranger (avatar, bio, socials, streak, heatmap), never learning-item titles/content. A private profile and a nonexistent username both return an identical 404 (extending ADR-016's existing "don't distinguish the reasons" rule to this new case).
+- Frontend `PublicProfilePage.tsx` at `/u/:username`, outside `AppLayout`/`ProtectedRoute` entirely — the one page in the app reachable while logged out.
+- Social link icons needed `react-icons` (new dependency) — lucide-react removed all brand/logo icons in a past version, confirmed by checking its actual exports rather than assuming; used `react-icons/fa6` for LinkedIn/GitHub/Instagram/X and `react-icons/si` for LeetCode (`fa6` doesn't have one).
+- A small new shadcn-pattern `Switch` component (Base UI's switch primitive didn't have one in this repo yet) for the public/private toggle.
+
+**Verification:** Backend — `go build`/`go vet`/full test suite clean, with new tests for username validation/normalization/uniqueness (`profile_service_test.go`) and the public endpoint's privacy enforcement (`public_profile_service_test.go`, including a "streak and heatmap actually populate" check against a real logged session). Manually end-to-end curl-tested the full flow against the live dev backend (set alice's username/bio/socials, fetched the public endpoint, toggled private and confirmed 404, then cleaned up the test data so the seeded dev account wasn't left in a modified state). Frontend — build/lint clean throughout.
+
+**Files created:** `backend/migrations/000008_add_user_profile_fields.{up,down}.sql`, `backend/internal/services/{public_profile_service,public_profile_service_test,profile_service_test}.go`, `backend/internal/handlers/public_profile_handler.go`; `frontend/src/components/profile/ContributionHeatmap.tsx`, `frontend/src/components/ui/switch.tsx`, `frontend/src/pages/PublicProfilePage.tsx`, `frontend/src/services/publicProfileApi.ts`, `frontend/src/utils/socialPlatforms.ts`.
+
+**Files modified:** `backend/internal/models/user.go`, `backend/internal/repositories/user_repository.go`, `backend/internal/services/{profile_service,dashboard_service}.go`, `backend/internal/handlers/{profile_handler,auth_handler,dashboard_handler}.go`, `backend/internal/routes/routes.go`, `backend/cmd/server/main.go`; `frontend/src/{types/api,services/profileApi}.ts`, `frontend/src/pages/ProfilePage.tsx`, `frontend/src/App.tsx`.
+
+**Key implementation decisions:** Recorded as ADR-027 (`docs/DECISIONS.md`) — username-based sharing, public-by-default-with-opt-out, both confirmed with the user rather than assumed.
+
+**Next recommended task:** Stage 2 — Study Sessions Teams-style calendar (schedule-x, chosen after researching react-big-calendar/FullCalendar/schedule-x/a shadcn community block; schedule-x won on React 19 support, CSS-variable theming that maps onto this app's Tailwind v4 tokens, and no forced modal to conflict with Base UI dialogs). Stage 3 after that — Dashboard's adaptive recent-activity window.

@@ -9,6 +9,7 @@ import (
 	"learnmap-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
 )
 
 type AuthHandler struct {
@@ -42,11 +43,15 @@ type loginRequest struct {
 }
 
 type userResponse struct {
-	ID          string  `json:"id"`
-	Email       string  `json:"email"`
-	DisplayName string  `json:"display_name"`
-	AvatarURL   *string `json:"avatar_url"`
-	CreatedAt   string  `json:"created_at"`
+	ID          string            `json:"id"`
+	Email       string            `json:"email"`
+	DisplayName string            `json:"display_name"`
+	AvatarURL   *string           `json:"avatar_url"`
+	Username    *string           `json:"username"`
+	Bio         *string           `json:"bio"`
+	SocialLinks map[string]string `json:"social_links"`
+	IsPublic    bool              `json:"is_public"`
+	CreatedAt   string            `json:"created_at"`
 }
 
 type authResponse struct {
@@ -60,8 +65,26 @@ func toUserResponse(u *models.User) userResponse {
 		Email:       u.Email,
 		DisplayName: u.DisplayName,
 		AvatarURL:   u.AvatarURL,
+		Username:    u.Username,
+		Bio:         u.Bio,
+		SocialLinks: socialLinksToMap(u.SocialLinks),
+		IsPublic:    u.IsPublic,
 		CreatedAt:   u.CreatedAt.Format(time.RFC3339),
 	}
+}
+
+// socialLinksToMap narrows datatypes.JSONMap (map[string]interface{}, since
+// it's a generic JSONB column) down to map[string]string for the API
+// response — every value written by ProfileService is always a string, so
+// anything else here would mean data written outside that path.
+func socialLinksToMap(links datatypes.JSONMap) map[string]string {
+	result := make(map[string]string, len(links))
+	for k, v := range links {
+		if s, ok := v.(string); ok {
+			result[k] = s
+		}
+	}
+	return result
 }
 
 // setRefreshCookie stores the refresh token as an httpOnly cookie — it is

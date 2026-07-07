@@ -9,15 +9,16 @@ import (
 )
 
 type Dependencies struct {
-	AuthService        *services.AuthService
-	AuthHandler        *handlers.AuthHandler
-	ProfileHandler     *handlers.ProfileHandler
-	ItemHandler        *handlers.LearningItemHandler
-	SessionHandler     *handlers.StudySessionHandler
-	DashboardHandler   *handlers.DashboardHandler
-	UploadHandler      *handlers.UploadHandler
-	UploadDir          string
-	CORSAllowedOrigins []string
+	AuthService          *services.AuthService
+	AuthHandler          *handlers.AuthHandler
+	ProfileHandler       *handlers.ProfileHandler
+	ItemHandler          *handlers.LearningItemHandler
+	SessionHandler       *handlers.StudySessionHandler
+	DashboardHandler     *handlers.DashboardHandler
+	PublicProfileHandler *handlers.PublicProfileHandler
+	UploadHandler        *handlers.UploadHandler
+	UploadDir            string
+	CORSAllowedOrigins   []string
 }
 
 // Register wires every route. Public auth endpoints (register/login/refresh)
@@ -42,6 +43,11 @@ func Register(router *gin.Engine, deps Dependencies) {
 	auth.POST("/register", middleware.RateLimit(10, 5), deps.AuthHandler.Register)
 	auth.POST("/login", middleware.RateLimit(10, 5), deps.AuthHandler.Login)
 	auth.POST("/refresh", deps.AuthHandler.Refresh)
+
+	// Public (unauthenticated) profile view — rate-limited since, unlike the
+	// rest of the API, it's meant to be reachable by anyone with the link,
+	// including scrapers.
+	api.GET("/public/profiles/:username", middleware.RateLimit(30, 15), deps.PublicProfileHandler.GetByUsername)
 
 	protected := api.Group("")
 	protected.Use(middleware.Auth(deps.AuthService))
@@ -69,6 +75,7 @@ func Register(router *gin.Engine, deps Dependencies) {
 
 		protected.GET("/dashboard", deps.DashboardHandler.GetDashboard)
 		protected.GET("/stats", deps.DashboardHandler.GetStats)
+		protected.GET("/profile/heatmap", deps.DashboardHandler.GetHeatmap)
 
 		protected.POST("/uploads", middleware.RateLimit(20, 10), deps.UploadHandler.Upload)
 	}

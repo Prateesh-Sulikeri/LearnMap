@@ -4,11 +4,17 @@
 
 export type LearningItemStatus = 'not_started' | 'in_progress' | 'completed'
 
+export type SocialPlatform = 'linkedin' | 'instagram' | 'github' | 'portfolio' | 'x' | 'leetcode'
+
 export interface User {
   id: string
   email: string
   display_name: string
   avatar_url: string | null
+  username: string | null
+  bio: string | null
+  social_links: Partial<Record<SocialPlatform, string>>
+  is_public: boolean
   created_at: string
 }
 
@@ -151,6 +157,24 @@ export interface StatsResponse {
 export interface UpdateProfileRequest {
   display_name?: string
   avatar_url?: string
+  username?: string
+  bio?: string
+  social_links?: Partial<Record<SocialPlatform, string>>
+  is_public?: boolean
+}
+
+export interface PublicProfile {
+  display_name: string
+  avatar_url: string | null
+  bio: string | null
+  social_links: Partial<Record<SocialPlatform, string>>
+  joined_at: string
+  current_streak: number
+  heatmap: DailyHoursPoint[]
+}
+
+export interface HeatmapResponse {
+  heatmap: DailyHoursPoint[]
 }
 
 export interface ChangePasswordRequest {

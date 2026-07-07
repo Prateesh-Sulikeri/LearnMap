@@ -129,6 +129,10 @@ UUID primary keys throughout (ADR-008). Soft deletes (`deleted_at`) on user-owne
 | password_hash  | TEXT          | NOT NULL (bcrypt)                         |
 | display_name   | TEXT          | NOT NULL                                  |
 | avatar_url     | TEXT          | nullable                                  |
+| username       | TEXT          | nullable, unique (plain index — always lowercased on write, see ADR-027); no shareable profile link until set |
+| bio            | TEXT          | nullable                                  |
+| social_links   | JSONB         | NOT NULL DEFAULT `{}` — map of platform key → URL, keys restricted to `models.SocialPlatforms` (migration 000008) |
+| is_public      | BOOLEAN       | NOT NULL DEFAULT true (ADR-027)           |
 | created_at     | TIMESTAMPTZ   | NOT NULL DEFAULT now()                    |
 | updated_at     | TIMESTAMPTZ   | NOT NULL DEFAULT now()                    |
 
@@ -205,8 +209,10 @@ Base path `/api/v1`. All routes except `auth/register`, `auth/login`, `auth/refr
 | POST   | /auth/refresh               | cookie | rotate access token using refresh cookie |
 | POST   | /auth/logout                | yes  | revoke refresh token, clear cookie        |
 | GET    | /auth/me                    | yes  | current user                              |
-| PUT    | /profile                    | yes  | update display_name / avatar_url          |
+| PUT    | /profile                    | yes  | update display_name / avatar_url / username / bio / social_links / is_public |
 | PUT    | /profile/password            | yes  | change password                           |
+| GET    | /profile/heatmap              | yes  | daily study hours, last 365 days (GitHub-graph-style) |
+| GET    | /public/profiles/:username     | none | shareable profile (ADR-027) — 404 identically for nonexistent or private |
 | GET    | /items                       | yes  | list caller's items (flat)                |
 | POST   | /items                       | yes  | create item                                |
 | PUT    | /items/:id                   | yes  | update title/description/deadline         |

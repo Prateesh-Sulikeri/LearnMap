@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Profile: heatmap, bio/socials, shareable public profiles (2026-07-07, stage 1 of a 3-part round)
+- Added a GitHub-contribution-graph-style activity heatmap (`ContributionHeatmap`, custom-built) to the Profile page, backed by a new `GET /profile/heatmap` endpoint (365 days of daily study hours).
+- Added bio, a chosen unique username, and six social links (LinkedIn/GitHub/Instagram/X/LeetCode/portfolio) to the profile. Added `react-icons` (brand logos only — lucide-react no longer ships those).
+- Added shareable public profiles at `/u/:username`: public by default with an opt-out toggle, no auth required to view, shows avatar/bio/socials/streak-rank/heatmap only (never learning-item content). A private or nonexistent username both return an identical 404.
+- New `users` columns (migration `000008`): `username` (unique, lowercased on write), `bio`, `social_links` (JSONB), `is_public`.
+- Remaining from the same round, not yet done: the Study Sessions Teams-style calendar (day/week/month + scheduling + honor-system completion) and the Dashboard's adaptive recent-activity window.
+
 ### Follow-up fixes: trash routing, numbering scope, Favs tab (2026-07-07)
 - Fixed: "Empty Trash" and permanent delete appeared broken from the UI — actually a stale running backend container (routes were correct in code, just not yet restarted to pick them up); no code fix needed, just a restart.
 - Changed: hierarchical numbering badges removed from the list and org-chart tree views — they now only appear in the notes focus-mode side tree, per direct feedback.

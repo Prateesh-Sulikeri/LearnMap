@@ -1,6 +1,6 @@
 # LearnMap.app — Project Status
 
-**Last updated:** 2026-07-07 (follow-up fixes round)
+**Last updated:** 2026-07-07 (Profile/Sessions/Dashboard expansion, stage 1 of 3 — Profile — done)
 
 ## Current Milestone
 Milestone 4 — Charts & Statistics (not started; a substantial UX/feature pass happened first — see below)
@@ -51,8 +51,14 @@ Three items from the same Todo were explicitly scoped down or deferred after ask
 - Added a clear (X) button to the Learning page search input.
 - Learning page tabs redesigned: Active now shows every item regardless of status (previously excluded completed ones); Completed unchanged; new Favs tab — backed by a new `is_favorite` column, migration, and `PATCH /items/:id/favorite` endpoint. **Corrected after direct feedback**: Favs is a root-level filter exactly like Completed (a favorited top-level topic shows with its entire subtree and the full List/Map toggle), not a separate flat any-depth list — only top-level topics can be favorited at all, enforced server-side.
 
+**Profile/Sessions/Dashboard expansion (2026-07-07) — stage 1 of 3 (Profile) done, Sessions calendar and Dashboard activity still in progress:**
+- GitHub-contribution-graph-style heatmap (`ContributionHeatmap`, custom-built, no new dependency) on the Profile page, backed by a new `GET /profile/heatmap` endpoint (365 days of daily study hours, reusing the existing `DailyHoursSince` repository query)
+- Bio, a chosen username, and six social links (LinkedIn/GitHub/Instagram/X/LeetCode/portfolio) added to the profile — `react-icons` added as a new dependency specifically for brand logos, since lucide-react dropped all brand/logo icons in a past version
+- Shareable public profiles at `/u/:username` (ADR-027): public by default, an opt-out toggle in Profile settings, no auth required to view. Shows avatar/name/bio/socials/streak-rank/heatmap only — never learning-item content, which stays private. A private or nonexistent username returns the identical 404 (ADR-016's existing "don't distinguish the reasons" rule)
+- New `users` columns: `username` (nullable, unique, lowercased on write), `bio`, `social_links` (JSONB), `is_public` (migration `000008`)
+
 ## Features In Progress
-None — Milestone 4 not yet started.
+Study Sessions Teams-style calendar (day/week/month toggle, scheduling + honor-system completion, day-detail panel) and the Dashboard adaptive recent-activity window — both requested in the same round as the Profile work above, not yet started. Milestone 4 (Charts & Statistics) also not yet started.
 
 ## Next Milestone
 Milestone 4 — `/stats` wired into Recharts (weekly hours, monthly hours, top topics, completion %), animated, responsive.
@@ -68,6 +74,8 @@ Milestone 4 — `/stats` wired into Recharts (weekly hours, monthly hours, top t
 - Trash retention (auto-purge after 7 days) is enforced lazily on the next `ListTrash` call, not a scheduled background job — there's no job scheduler in this project yet. A user who never re-opens the Trash page keeps expired items around indefinitely (harmlessly, just not purged) until they do.
 - Markdown export's table-of-contents anchor links use a GitHub-style auto-slug guess; not every markdown renderer slugs headings identically, so TOC links may not jump correctly in all viewers (the exported content itself is unaffected).
 - The notes editor's new pure logic (hierarchical numbering, the image-size text rewrite, markdown export) has no dedicated frontend test coverage — same gap as the point above, not a new one.
+- Public profile route (`GET /public/profiles/:username`) is rate-limited (30/15min) but otherwise has no bot/scraper defense (no CAPTCHA, no robots.txt directive) — acceptable at pilot scale, worth revisiting before any real public launch.
+- No username availability check as the user types — they only find out it's taken on Save. A live-check endpoint would be a nice follow-up, not implemented now.
 - **Note image uploads are stored on local disk** (`/uploads`, ADR-022) — must move to persistent object storage before any deploy to a host without a persistent filesystem. The static serving route is also intentionally unauthenticated (browsers don't send auth headers on `<img>` requests); protected only by unguessable filenames, not real access control.
 - The post-M3 UX pass above was verified via clean backend build/vet/test (including new Go tests), clean frontend build/lint, and full Postman/Newman regression (including live curl end-to-end proof of the upload endpoint) — but not via independent browser-automation click-through (same tooling gap as M2/M3). The notes editor's cursor-insertion mechanics and the notes dialog's internal scroll behavior with a genuinely long note are the two areas most worth a manual click-test before calling this pass fully done.
 - Milestones 2 and 3's UI were verified via clean typecheck/build/lint, a manual API-contract cross-check between frontend services and backend DTOs, and (for M2) real backend request logs proving a live register→me→dashboard flow succeeded — but not via independent browser-automation click-through in this pass (headless browser tooling wasn't set up; the user declined installing it for now). Recommend a manual spot-check of the full click-through flow (and responsive breakpoints) before Milestone 5's dedicated cross-device QA pass.

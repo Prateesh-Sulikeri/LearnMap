@@ -49,6 +49,7 @@ func main() {
 	itemService := services.NewLearningItemService(itemRepo, eventService)
 	sessionService := services.NewStudySessionService(sessionRepo, itemRepo, eventService)
 	dashboardService := services.NewDashboardService(sessionRepo, itemRepo)
+	publicProfileService := services.NewPublicProfileService(userRepo, sessionRepo)
 	uploadService := services.NewUploadService(cfg.UploadDir, cfg.MaxUploadSizeMB)
 
 	authHandler := handlers.NewAuthHandler(authService, cfg.RefreshCookieName, cfg.RefreshCookieDomain, cfg.RefreshCookieSecure, cfg.RefreshTokenTTL)
@@ -56,19 +57,21 @@ func main() {
 	itemHandler := handlers.NewLearningItemHandler(itemService)
 	sessionHandler := handlers.NewStudySessionHandler(sessionService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
+	publicProfileHandler := handlers.NewPublicProfileHandler(publicProfileService)
 	uploadHandler := handlers.NewUploadHandler(uploadService)
 
 	router := gin.New()
 	routes.Register(router, routes.Dependencies{
-		AuthService:        authService,
-		AuthHandler:        authHandler,
-		ProfileHandler:     profileHandler,
-		ItemHandler:        itemHandler,
-		SessionHandler:     sessionHandler,
-		DashboardHandler:   dashboardHandler,
-		UploadHandler:      uploadHandler,
-		UploadDir:          cfg.UploadDir,
-		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
+		AuthService:          authService,
+		AuthHandler:          authHandler,
+		ProfileHandler:       profileHandler,
+		ItemHandler:          itemHandler,
+		SessionHandler:       sessionHandler,
+		DashboardHandler:     dashboardHandler,
+		PublicProfileHandler: publicProfileHandler,
+		UploadHandler:        uploadHandler,
+		UploadDir:            cfg.UploadDir,
+		CORSAllowedOrigins:   cfg.CORSAllowedOrigins,
 	})
 
 	log.Printf("listening on :%s", cfg.Port)
