@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarClock, Plus } from 'lucide-react'
 import moment from 'moment'
@@ -12,19 +12,27 @@ import { AddSessionDialog } from '@/components/AddSessionDialog'
 import { ScheduleSessionDialog } from '@/components/ScheduleSessionDialog'
 import { ConfirmSessionDialog } from '@/components/ConfirmSessionDialog'
 import { DeleteSessionDialog } from '@/components/DeleteSessionDialog'
+import { SessionDetailsDialog } from '@/components/SessionDetailsDialog'
 import ShadcnBigCalendar from '@/components/shadcn-big-calendar/shadcn-big-calendar'
 import type { StudySession } from '@/types/api'
 
 const localizer = momentLocalizer(moment)
+
+function getStartOfToday(): Date {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return today
+}
 
 export default function StudySessionsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [confirmSession, setConfirmSession] = useState<StudySession | null>(null)
+  const [detailsSession, setDetailsSession] = useState<StudySession | null>(null)
   const [calendarView, setCalendarView] = useState<View>('week')
   const [calendarDate, setCalendarDate] = useState(new Date())
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+  const [selectedDay, setSelectedDay] = useState<Date>(getStartOfToday())
 
   const {
     data: sessions,
@@ -56,6 +64,27 @@ export default function StudySessionsPage() {
         )
       })
     : []
+
+  // Get topic title for session details
+  const getTopicTitle = (session: StudySession) => {
+    return titleByItemId.get(session.learning_item_id) || 'Unknown Topic'
+  }
+
+  // Scroll calendar to current time on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Scroll to current hour in day/week view
+      const hourElement = document.querySelector('[data-time-slot]')
+      if (hourElement) {
+        const currentHour = new Date().getHours()
+        const scrollTarget = document.querySelector(`[data-time="${currentHour}:00"]`)
+        if (scrollTarget) {
+          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [calendarView])
 
   return (
     <div className="space-y-4">
@@ -98,11 +127,7 @@ export default function StudySessionsPage() {
               style={{ height: 650 }}
               eventPropGetter={() => ({ className: 'event-variant-primary cursor-pointer' })}
               onSelectEvent={(event) => {
-                if (event.resource?.scheduled_end) {
-                  setConfirmSession(event.resource)
-                } else {
-                  setDeleteId(event.resource?.id || null)
-                }
+                setDetailsSession(event.resource || null)
               }}
               onSelectSlot={(slotInfo) => {
                 setSelectedDay(slotInfo.start)
@@ -113,47 +138,58 @@ export default function StudySessionsPage() {
           </div>
 
           {/* Day-detail side panel */}
-          {selectedDay && (
-            <div className="rounded-xl border border-border p-4">
-              <h3 className="font-heading text-sm font-semibold mb-4">
-                {selectedDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </h3>
-              {sessionsForSelectedDay.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No sessions on this day</p>
-              ) : (
-                <div className="space-y-2">
-                  {sessionsForSelectedDay.map((session) => (
-                    <div key={session.id} className="rounded-lg border border-border bg-card p-3 text-xs space-y-1">
-                      <p className="font-semibold">{titleByItemId.get(session.learning_item_id) || 'Unknown'}</p>
-                      <p className="text-muted-foreground">
-                        {session.hours}h {session.notes && `• ${session.notes}`}
-                      </p>
-                      <div className="flex gap-1 pt-2">
-                        {session.scheduled_end && !session.confirmed_at ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 text-xs"
-                            onClick={() => setConfirmSession(session)}
-                          >
-                            Confirm
-                          </Button>
+          <div className="rounded-xl border border-border p-4">
+            <h3 className="font-heading text-sm font-semibold mb-4">
+              {selectedDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </h3>
+            {sessionsForSelectedDay.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No data available</p>
+            ) : (
+              <div className="space-y-3">
+                {sessionsForSelectedDay.map((session) => {
+                  const isPending = session.scheduled_end && !session.confirmed_at
+                  const isExpired = isPending && new Date() > new Date(session.scheduled_end!)
+                  const topicTitle = getTopicTitle(session)
+
+                  return (
+                    <button
+                      key={session.id}
+                      onClick={() => setDetailsSession(session)}
+                      className="w-full text-left rounded-lg border border-border bg-card p-3 hover:bg-muted transition-colors"
+                    >
+                      <p className="font-semibold text-sm">{topicTitle}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {session.hours > 0 ? `${session.hours}h` : ''}
+                        {session.scheduled_start ? (
+                          <>
+                            {' '}
+                            {new Date(session.scheduled_start).toLocaleTimeString('en-US', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                            {' — '}
+                            {new Date(session.scheduled_end!).toLocaleTimeString('en-US', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </>
                         ) : null}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 text-xs text-destructive"
-                          onClick={() => setDeleteId(session.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                      </p>
+                      {isExpired && (
+                        <p className="text-xs text-destructive font-semibold mt-1">Not confirmed</p>
+                      )}
+                      {isPending && !isExpired && (
+                        <p className="text-xs text-warning font-semibold mt-1">Pending</p>
+                      )}
+                      {session.notes && (
+                        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{session.notes}</p>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -170,6 +206,16 @@ export default function StudySessionsPage() {
       <AddSessionDialog open={addOpen} onOpenChange={setAddOpen} />
       <ScheduleSessionDialog open={scheduleOpen} onOpenChange={setScheduleOpen} />
       <ConfirmSessionDialog session={confirmSession} open={confirmSession !== null} onOpenChange={(open) => !open && setConfirmSession(null)} />
+      <SessionDetailsDialog
+        session={detailsSession}
+        topicTitle={detailsSession ? getTopicTitle(detailsSession) : undefined}
+        open={detailsSession !== null}
+        onOpenChange={(open) => !open && setDetailsSession(null)}
+        onConfirmClick={() => {
+          if (detailsSession) setConfirmSession(detailsSession)
+          setDetailsSession(null)
+        }}
+      />
       {deleteId && (
         <DeleteSessionDialog
           open={deleteId !== null}

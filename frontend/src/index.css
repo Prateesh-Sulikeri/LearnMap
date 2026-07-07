@@ -137,3 +137,16 @@
  * be at least 44x44px on phone. Tailwind's `size-11` (44px) utility already
  * covers this — use it for icon buttons / tap targets, no custom class needed.
  */
+
+/* Hide spinner controls on datetime/number inputs */
+input[type="datetime-local"]::-webkit-outer-spin-button,
+input[type="datetime-local"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="datetime-local"][type="number"] {
+  -moz-appearance: textfield;
+}

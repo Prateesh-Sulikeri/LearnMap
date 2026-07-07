@@ -118,7 +118,15 @@ export function AddSessionDialog({ open, onOpenChange, defaultItemId }: AddSessi
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="session-hours">Hours</Label>
-              <Input id="session-hours" type="number" step="0.25" min="0.25" max="24" {...register('hours')} />
+              <Input
+                id="session-hours"
+                type="number"
+                step="0.25"
+                min="0.25"
+                max="24"
+                className="[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                {...register('hours')}
+              />
               {errors.hours && <p className="text-sm text-destructive">{errors.hours.message}</p>}
             </div>
             <div className="space-y-2">

@@ -24,7 +24,21 @@ const scheduleFormSchema = z.object({
   learningItemId: z.string().min(1, 'Pick a topic'),
   scheduledStart: z.string().min(1, 'Pick a start time'),
   scheduledEnd: z.string().min(1, 'Pick an end time'),
-})
+}).refine(
+  (data) => {
+    const start = new Date(data.scheduledStart)
+    const end = new Date(data.scheduledEnd)
+    return start < end
+  },
+  { message: 'End time must be after start time', path: ['scheduledEnd'] }
+).refine(
+  (data) => {
+    const start = new Date(data.scheduledStart)
+    const now = new Date()
+    return start > now
+  },
+  { message: 'Cannot schedule sessions in the past', path: ['scheduledStart'] }
+)
 
 type ScheduleFormInput = z.input<typeof scheduleFormSchema>
 type ScheduleFormValues = z.output<typeof scheduleFormSchema>
