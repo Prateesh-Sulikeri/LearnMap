@@ -39,7 +39,7 @@
 **Milestone 4 — Charts & Statistics** (completed 2026-07-07)
 - `/stats?range=week|month|year` (scaffolded since Milestone 1, first dedicated test coverage added now): exact aggregation math per range, invalid-range rejection, cross-user isolation
 - Dashboard landing page chart-ified per DD_v1.pdf's own layout: Weekly Hours (bar), Top Topics (ranked horizontal bar, replacing the plain list), Completion % (a radial meter — a single ratio against a limit isn't a pie-chart job)
-- New dedicated Statistics page (`/stats`) with a Weekly/Monthly/Yearly toggle (range lives in the URL) driving one area chart; new nav entry
+- New dedicated Statistics page (`/stats`) with a Weekly/Monthly/Yearly toggle (range lives in the URL) driving one area chart; new nav entry. **Later removed (2026-07-07, direct follow-up feedback) as an unnecessary separate page** — the same toggle + chart now lives directly on the Dashboard, replacing its old fixed-to-last-7-days chart; one fewer nav item.
 - Recharts added; new `components/charts/` + shared `components/StatCard.tsx`
 - Exit criteria met: charts render live per-user data (verified via curl math checks and Playwright screenshots), animate on load (Recharts default), responsive at phone/tablet/laptop (verified via Playwright)
 

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Dashboard/Stats merge; Learning page favorites and layout rework (2026-07-07)
+- Removed: the dedicated Statistics page (`/stats`) and its nav entry. Its Weekly/Monthly/Yearly toggle and trend chart now live directly on the Dashboard, replacing the old fixed-to-last-7-days "Weekly hours" chart — one page doing the job of two.
+- Changed: any learning item can now be favorited, not just a top-level topic (`SetFavorite`'s root-only rejection removed, both backend and the frontend's star button). A favorited non-root item shows in the Favs tab as its own standalone entry — itself and its own descendants only, independent of its ancestors and siblings — instead of requiring a whole top-level topic. See ADR-030.
+- Changed: a completed root topic no longer shows in Active or Favs — it moves to Completed only (reversing the earlier "Active shows everything regardless of status" choice). A favorited-and-completed topic keeps its favorite flag; it simply reappears in Favs automatically if reopened.
+- Changed: Learning page tabs reordered to Favs/Active/Completed, and Favs is now the default tab (was Active).
+- Changed: Learning page layout reorganized — added a page title (there wasn't one), moved the List/Map toggle and Trash link into a title row as page-level utility actions, grouped the tabs and search into their own row below it.
+
 ### Milestone 5 — Polish & Cross-Device QA (2026-07-07)
 - Fixed: ProfilePage's dashboard/heatmap queries had no loading skeleton or error message (an empty-state audit gap).
 - Fixed: `--success`/`--warning` failed WCAG AA contrast when used as text (they were designed for icon fills only) — added `--success-text`/`--warning-text`, darker steps of the same hue, applied to the handful of actual-text usages (completed-item strikethrough titles, "In progress" labels); icon fills unchanged.

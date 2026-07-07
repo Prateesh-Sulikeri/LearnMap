@@ -58,6 +58,31 @@ export function findRootContaining(roots: LearningTreeNode[], id: string): Learn
   return roots.find((root) => containsId(root, id)) ?? null
 }
 
+/**
+ * Any node can be favorited, not just a top-level topic. A favorited node
+ * displays as its own standalone entry (itself + its own descendants),
+ * independent of its ancestors — so favoriting a deeply-nested node with
+ * children shows just that node's subtree in the Favs tab, not the whole
+ * original topic it lives in.
+ *
+ * Walks top-down: once a favorited node is found, its descendants are NOT
+ * searched further, even if one of them is also favorited — a nested
+ * favorite is already visible within its favorited ancestor's own subtree,
+ * so surfacing it again as a second, separate top-level entry would just
+ * duplicate it.
+ */
+export function collectFavoriteRoots(nodes: LearningTreeNode[]): LearningTreeNode[] {
+  const result: LearningTreeNode[] = []
+  for (const node of nodes) {
+    if (node.is_favorite) {
+      result.push(node)
+    } else {
+      result.push(...collectFavoriteRoots(node.children))
+    }
+  }
+  return result
+}
+
 export interface CompletionCount {
   completed: number
   total: number

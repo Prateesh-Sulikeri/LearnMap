@@ -1,5 +1,19 @@
 # LearnMap.app — Architecture Decision Records
 
+## ADR-030: Any item can be favorited; a favorited non-root item displays as its own pruned subtree
+
+**Decision:** `SetFavorite` no longer rejects non-root items — any learning item, at any depth, can be favorited. The Favs tab collects every favorited node in the tree (via `collectFavoriteRoots`, a top-down walk that stops descending once it finds a favorited node) and displays each as its own independent entry: itself plus its own descendants, with its real ancestors and siblings excluded entirely. Favoriting a node with children no longer requires it to be a root topic. Separately, a completed root topic now drops out of both Active and Favs (still reachable in Completed) — reversing this project's own earlier choice to show every root in Active regardless of status.
+
+**Context:** Direct feedback: favoriting was too restrictive (only root-level topics could be starred), and completed topics were cluttering both Active and Favs when the user wanted them to "graduate" to Completed only. Also asked to reorder the tabs to Favs/Active/Completed and make Favs the default landing tab.
+
+**Alternatives considered:** Keeping favorites root-only and instead letting a user "promote" a sub-item to root level before favoriting it — rejected as extra friction for something that should just work directly on the item you're looking at. Clearing `is_favorite` server-side the moment an item completes — rejected in favor of a display-only filter: the flag stays true in the database, so reopening a completed+favorited item makes it reappear in Favs automatically, with no need to re-favorite it.
+
+**Reasoning:** Collecting favorites as "stop descending once you find one" (rather than "find every favorited node regardless of nesting") avoids showing a favorited grandchild twice — once nested inside its already-favorited parent's subtree, once again as its own separate top-level entry. `TreeNode`'s and `OrgChartNode`'s "Add sub-item" action already existed unconditionally at every depth, so a favorited non-root node shown in Favs automatically supports adding children to it — no special-casing needed once the pruned-subtree rendering was in place.
+
+**Status:** Approved and implemented (`SetFavorite` in `learning_item_service.go`; `collectFavoriteRoots` in `frontend/src/utils/tree.ts`; `LearningTreePage.tsx`'s tab computation; star button un-gated in `TreeNode.tsx`/`OrgChartNode.tsx`).
+
+---
+
 ## ADR-029: `study_sessions.learning_item_id` kept as "primary," full topic set in a join table
 
 **Decision:** A study session can cover more than one topic. Rather than replacing the existing `study_sessions.learning_item_id` column, added a new `study_session_topics` many-to-many join table (migration `000011`) holding the full topic set for every session — including single-topic ones, backfilled from their existing `learning_item_id` at migration time. `learning_item_id` stays as the "primary" (first-chosen) topic.

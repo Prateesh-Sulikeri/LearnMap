@@ -25,7 +25,7 @@ export function OrgChartTree({ tree, isCollapsed, onToggle, onOpenNotes }: OrgCh
       <div className="flex w-max min-w-full justify-center gap-10 px-2">
         {tree.map((root) => (
           <ul key={root.id} className="org-tree">
-            <OrgChartNode node={root} isCollapsed={isCollapsed} onToggle={onToggle} onOpenNotes={onOpenNotes} isRoot />
+            <OrgChartNode node={root} isCollapsed={isCollapsed} onToggle={onToggle} onOpenNotes={onOpenNotes} />
           </ul>
         ))}
       </div>

@@ -114,19 +114,20 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, isLa
             {node.title}
           </button>
           <NoteIndicator note={node.description} onClick={() => onOpenNotes(node.id)} />
-          {/* Only a top-level topic can be favorited — it carries its whole subtree into the Favs tab, not an individual sub-item. */}
-          {depth === 0 && (
-            <button
-              type="button"
-              onClick={() => toggleFavorite.mutate()}
-              disabled={toggleFavorite.isPending}
-              aria-label={node.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-              className="shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 data-[active=true]:opacity-100"
-              data-active={node.is_favorite}
-            >
-              <Star className={cn('size-4', node.is_favorite ? 'fill-primary text-primary' : 'text-muted-foreground')} />
-            </button>
-          )}
+          {/* Any node can be favorited, not just a top-level topic — a
+              favorited non-root node shows as its own standalone entry
+              (itself + its descendants) in the Favs tab, independent of
+              its ancestors. */}
+          <button
+            type="button"
+            onClick={() => toggleFavorite.mutate()}
+            disabled={toggleFavorite.isPending}
+            aria-label={node.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+            className="shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 data-[active=true]:opacity-100"
+            data-active={node.is_favorite}
+          >
+            <Star className={cn('size-4', node.is_favorite ? 'fill-primary text-primary' : 'text-muted-foreground')} />
+          </button>
         </div>
 
         <Tooltip>

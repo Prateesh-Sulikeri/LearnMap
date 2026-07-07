@@ -1,15 +1,45 @@
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarClock, CheckCircle2, Flame, ListTodo } from 'lucide-react'
+import { CalendarClock, CalendarDays, Calendar as CalendarIcon, CalendarRange, CheckCircle2, Flame, ListTodo } from 'lucide-react'
 import { dashboardApi } from '@/services/dashboardApi'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { StatsRange } from '@/types/api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatCard } from '@/components/StatCard'
-import { WeeklyHoursChart } from '@/components/charts/WeeklyHoursChart'
 import { TopTopicsChart } from '@/components/charts/TopTopicsChart'
 import { CompletionMeter } from '@/components/charts/CompletionMeter'
+import { HoursTrendChart } from '@/components/charts/HoursTrendChart'
+import { cn } from '@/lib/utils'
+
+const RANGE_OPTIONS: { value: StatsRange; label: string; icon: typeof CalendarDays }[] = [
+  { value: 'week', label: 'Weekly', icon: CalendarDays },
+  { value: 'month', label: 'Monthly', icon: CalendarIcon },
+  { value: 'year', label: 'Yearly', icon: CalendarRange },
+]
 
 export default function DashboardPage() {
+  // Range lives in the URL (not local state), matching the Learning page's
+  // tab/search convention — "Dashboard?range=month" is a real, shareable,
+  // back-button-friendly link, not just a snapshot of local component state.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rangeParam = searchParams.get('range')
+  const range: StatsRange = rangeParam === 'month' ? 'month' : rangeParam === 'year' ? 'year' : 'week'
+  const setRange = (next: StatsRange) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      if (next === 'week') params.delete('range')
+      else params.set('range', next)
+      return params
+    })
+  }
+
   const { data, isLoading, isError } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+  } = useQuery({ queryKey: ['stats', range], queryFn: () => dashboardApi.getStats(range) })
 
   if (isLoading) {
     return (
@@ -47,10 +77,42 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="font-heading text-base">Weekly hours</CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle className="font-heading text-base">
+                  {range === 'week' ? 'Hours this week' : range === 'month' ? 'Hours this month' : 'Hours this year'}
+                </CardTitle>
+                <CardDescription>
+                  {range === 'week' && 'Daily study hours over the last 7 days.'}
+                  {range === 'month' && 'Daily study hours over the last 30 days.'}
+                  {range === 'year' && 'Monthly study hours over the last 12 months.'}
+                </CardDescription>
+              </div>
+              {/* Filter row scoping the one chart below it, per the dataviz
+                  skill — never per-chart controls buried elsewhere. */}
+              <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border p-0.5">
+                {RANGE_OPTIONS.map(({ value, label, icon: Icon }) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={cn('gap-1.5', range === value && 'bg-accent text-accent-foreground')}
+                    onClick={() => setRange(value)}
+                  >
+                    <Icon className="size-4" />
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <WeeklyHoursChart data={data.weekly_hours_chart} />
+            {statsLoading && <Skeleton className="h-64 w-full" />}
+            {statsError && (
+              <p className="text-sm text-destructive">Couldn&apos;t load your statistics. Try refreshing the page.</p>
+            )}
+            {stats && <HoursTrendChart points={stats.points} range={range} />}
           </CardContent>
         </Card>
 
