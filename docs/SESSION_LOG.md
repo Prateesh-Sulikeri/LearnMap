@@ -1,5 +1,76 @@
 # LearnMap.app — Session Log
 
+## 2026-07-07 — Study Sessions calendar & Dashboard adaptive activity (pending_changes Stage 2 of 3)
+
+**Summary:** Completed pending_changes.md items for Study Sessions and Dashboard, implementing calendar view refinements, scheduled session support (backend + frontend), and adaptive recent-activity logic.
+
+**Work completed:**
+
+### Study Sessions
+- **Calendar defaults to Week view:** Updated StudySessionsPage to default react-big-calendar to Week view instead of Month, added state management for view changes
+- **Removed duplicate table:** Deleted the table below the calendar — calendar is now the single view for all sessions
+- **Scheduling + honor-system completion (backend):**
+  - Migration 000009: Added `scheduled_start`, `scheduled_end`, `confirmed_at` nullable TIMESTAMPTZ columns to study_sessions
+  - Updated StudySession model with new scheduling fields
+  - Added `CreateScheduledSessionInput` type: topic + start/end timestamps (no hours yet)
+  - Added `ConfirmScheduledSessionInput` type: optional hours + notes for confirmation
+  - Implemented `CreateScheduled()` service method: reserves future time block, sets Hours=0 initially
+  - Implemented `ConfirmScheduled()` service method: marks scheduled session complete, calculates hours from duration if not provided
+  - Updated StudySessionRepository with `Update()` method for modifications
+  - Updated routes with POST `/sessions/:id/confirm` endpoint
+  - Updated handler request/response types to include scheduling fields; made Create() flexible to accept either scheduled or retroactive sessions
+- **Scheduling + honor-system completion (frontend):**
+  - Updated API types: StudySession now includes scheduled_start/end/confirmed_at fields
+  - Updated CreateSessionRequest to support both retroactive (hours+session_date) and scheduled (scheduled_start/end) paths
+  - Added ConfirmSessionRequest type for the confirmation endpoint
+  - New ScheduleSessionDialog component: topic select + datetime inputs for start/end, calculates default duration
+  - New ConfirmSessionDialog component: shows scheduled window, optional hours adjustment, notes
+  - Updated StudySessionsPage with "Schedule Session" button alongside "Add Session"; wired dialogs to state
+  - Updated sessionsApi with `confirm()` method
+
+### Dashboard
+- **Adaptive recent-activity window:** Replaced `buildRecentActivity()` with `buildAdaptiveRecentActivity()`:
+  - If today's activity >= 10 items: show today's activity only (sorted, capped at 10)
+  - Otherwise: expand to past 7 days (items updated in last 7 days + all today's sessions, sorted, capped at 10)
+  - Rationale: calendar now provides chronological tracking; activity log focuses on high-activity days as most relevant context
+
+**Files created:**
+- `backend/migrations/000009_add_study_sessions_scheduling.{up,down}.sql`
+- `frontend/src/components/ScheduleSessionDialog.tsx`
+- `frontend/src/components/ConfirmSessionDialog.tsx`
+
+**Files modified:**
+- `backend/internal/models/study_session.go` (added scheduling fields)
+- `backend/internal/repositories/study_session_repository.go` (added Update method)
+- `backend/internal/services/study_session_service.go` (added CreateScheduled + ConfirmScheduled methods + input types)
+- `backend/internal/handlers/study_session_handler.go` (updated request/response types, added CreateScheduled + ConfirmScheduled handlers)
+- `backend/internal/services/dashboard_service.go` (replaced buildRecentActivity with buildAdaptiveRecentActivity)
+- `backend/internal/routes/routes.go` (added confirm endpoint)
+- `frontend/src/pages/StudySessionsPage.tsx` (calendar defaults to week, removed table, added schedule button)
+- `frontend/src/services/sessionsApi.ts` (added confirm method)
+- `frontend/src/types/api.ts` (updated StudySession type, added ConfirmSessionRequest)
+
+**Verification:** `npm run build` succeeds for frontend (TypeScript + Vite clean). Backend code is syntactically correct (checked manually; Go not available in environment). API contract follows existing patterns (user_id scoped, validation in service layer, DTOs match frontend types).
+
+**Implementation notes:**
+- Scheduled sessions start with Hours=0 and ConfirmedAt=null; become "pending" in that state
+- On confirmation, Hours can be derived from scheduled duration (ScheduledEnd - ScheduledStart) or user-provided
+- Existing retroactively-logged sessions have all scheduling fields null (backward-compatible)
+- Frontend UI for calendar drag-to-schedule, day-detail panel, and styling for expired sessions still TODO
+- Per user request: "completion and working as intended" prioritized over deep testing
+
+**Next recommended tasks:**
+1. Calendar drag-to-schedule: open ScheduleSessionDialog when user drags/selects time slot
+2. Day-detail side panel: clicking a calendar day shows that day's sessions in a right-side panel
+3. Visual styling: expired scheduled sessions grayed-out with "Did you complete this?" action button
+4. Manual browser testing of the scheduling flow end-to-end
+
+**Commits:**
+- `ab04365`: Study Sessions calendar & Dashboard adaptive activity (Stage 2 of 3) — backend + types
+- `10b6490`: Add frontend UI for scheduling and confirming sessions
+
+---
+
 ## 2026-07-07 — Incident: test suite was wiping the live dev database
 
 **Summary:** User reported their real account kept disappearing, and that `alice`/`bob` rows in the database had no working password. Root-caused immediately: `internal/testutil.TestDatabaseURL()` defaulted to `postgres://.../learnmap` — the exact same database name `docker-compose.yml`'s `postgres` service and the running `learnmap-backend` container both use for real dev data — and every test invocation this session had explicitly passed `TEST_DATABASE_URL` pointing at that same `learnmap` database (copied from `backend/README.md`'s own testing section, which had the same mistake baked into its example command). `TruncateAll` (`TRUNCATE TABLE users, ... CASCADE`) runs at the start of nearly every test, so every `go test` run this session silently wiped whatever real data existed. Confirmed via direct inspection: the live `users` table contained exactly two rows, `alice@example.com`/`bob@example.com` with `password_hash = 'hash'` (a literal fixture string from `learning_item_service_test.go`, not a real bcrypt hash) — the leftovers of whichever test ran last, with the user's actual account already gone.

@@ -1,6 +1,6 @@
 # LearnMap.app — Project Status
 
-**Last updated:** 2026-07-07 (Profile/Sessions/Dashboard expansion, stage 1 of 3 — Profile — done)
+**Last updated:** 2026-07-07 (Profile/Sessions/Dashboard expansion, stage 2 of 3 — Sessions/Dashboard — in progress)
 
 ## Current Milestone
 Milestone 4 — Charts & Statistics (not started; a substantial UX/feature pass happened first — see below)
@@ -51,14 +51,25 @@ Three items from the same Todo were explicitly scoped down or deferred after ask
 - Added a clear (X) button to the Learning page search input.
 - Learning page tabs redesigned: Active now shows every item regardless of status (previously excluded completed ones); Completed unchanged; new Favs tab — backed by a new `is_favorite` column, migration, and `PATCH /items/:id/favorite` endpoint. **Corrected after direct feedback**: Favs is a root-level filter exactly like Completed (a favorited top-level topic shows with its entire subtree and the full List/Map toggle), not a separate flat any-depth list — only top-level topics can be favorited at all, enforced server-side.
 
-**Profile/Sessions/Dashboard expansion (2026-07-07) — stage 1 of 3 (Profile) done, Sessions calendar and Dashboard activity still in progress:**
-- GitHub-contribution-graph-style heatmap (`ContributionHeatmap`, custom-built, no new dependency) on the Profile page, backed by a new `GET /profile/heatmap` endpoint (365 days of daily study hours, reusing the existing `DailyHoursSince` repository query)
-- Bio, a chosen username, and six social links (LinkedIn/GitHub/Instagram/X/LeetCode/portfolio) added to the profile — `react-icons` added as a new dependency specifically for brand logos, since lucide-react dropped all brand/logo icons in a past version
-- Shareable public profiles at `/u/:username` (ADR-027): public by default, an opt-out toggle in Profile settings, no auth required to view. Shows avatar/name/bio/socials/streak-rank/heatmap only — never learning-item content, which stays private. A private or nonexistent username returns the identical 404 (ADR-016's existing "don't distinguish the reasons" rule)
-- New `users` columns: `username` (nullable, unique, lowercased on write), `bio`, `social_links` (JSONB), `is_public` (migration `000008`)
+**Profile/Sessions/Dashboard expansion (2026-07-07):**
+- **Stage 1 (Profile) — DONE:**
+  - GitHub-contribution-graph-style heatmap (`ContributionHeatmap`, custom-built, no new dependency) on the Profile page, backed by a new `GET /profile/heatmap` endpoint (365 days of daily study hours, reusing the existing `DailyHoursSince` repository query)
+  - Bio, a chosen username, and six social links (LinkedIn/GitHub/Instagram/X/LeetCode/portfolio) added to the profile — `react-icons` added as a new dependency specifically for brand logos, since lucide-react dropped all brand/logo icons in a past version
+  - Shareable public profiles at `/u/:username` (ADR-027): public by default, an opt-out toggle in Profile settings, no auth required to view. Shows avatar/name/bio/socials/streak-rank/heatmap only — never learning-item content, which stays private. A private or nonexistent username returns the identical 404 (ADR-016's existing "don't distinguish the reasons" rule)
+  - New `users` columns: `username` (nullable, unique, lowercased on write), `bio`, `social_links` (JSONB), `is_public` (migration `000008`)
+
+- **Stage 2 (Sessions/Dashboard) — IN PROGRESS:**
+  - Study Sessions: calendar now defaults to Week view (not Month); removed duplicate table below calendar
+  - Scheduled sessions (honor-system completion):
+    - Backend: migration 000009 adds scheduled_start, scheduled_end, confirmed_at to study_sessions; CreateScheduled() service reserves future blocks, ConfirmScheduled() marks complete
+    - Frontend: ScheduleSessionDialog component for selecting topic + start/end times; ConfirmSessionDialog for confirming with optional hours/notes; both wired into StudySessionsPage
+    - API: flexible POST /sessions for both retroactive and scheduled sessions; new POST /sessions/:id/confirm for completion
+  - Dashboard: adaptive recent-activity window — shows today's activity if >= 10 items, otherwise expands to past 7 days
+  - **Still TODO:** calendar drag-to-schedule, day-detail side panel, styling for expired sessions, comprehensive testing
 
 ## Features In Progress
-Study Sessions Teams-style calendar (day/week/month toggle, scheduling + honor-system completion, day-detail panel) and the Dashboard adaptive recent-activity window — both requested in the same round as the Profile work above, not yet started. Milestone 4 (Charts & Statistics) also not yet started.
+- Study Sessions: Calendar drag-to-schedule, day-detail side panel (clicking day shows sessions in right panel), visual styling for expired scheduled sessions (grayed-out with "Did you complete?" action)
+- Milestone 4 (Charts & Statistics): not yet started
 
 ## Next Milestone
 Milestone 4 — `/stats` wired into Recharts (weekly hours, monthly hours, top topics, completion %), animated, responsive.
