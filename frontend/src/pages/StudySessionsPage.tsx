@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarClock, Plus, Trash2 } from 'lucide-react'
+import { CalendarClock, Plus } from 'lucide-react'
 import moment from 'moment'
 import { momentLocalizer } from 'react-big-calendar'
+import type { View } from 'react-big-calendar'
 import { sessionsApi } from '@/services/sessionsApi'
 import { itemsApi } from '@/services/itemsApi'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
 import { DeleteSessionDialog } from '@/components/DeleteSessionDialog'
 import ShadcnBigCalendar from '@/components/shadcn-big-calendar/shadcn-big-calendar'
@@ -17,6 +17,7 @@ const localizer = momentLocalizer(moment)
 export default function StudySessionsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [calendarView, setCalendarView] = useState<View>('week')
 
   const {
     data: sessions,
@@ -62,6 +63,8 @@ export default function StudySessionsPage() {
           <ShadcnBigCalendar
             localizer={localizer}
             events={calendarEvents}
+            view={calendarView}
+            onView={setCalendarView}
             style={{ height: 650 }}
             eventPropGetter={() => ({ className: 'event-variant-primary' })}
           />
@@ -75,43 +78,6 @@ export default function StudySessionsPage() {
           <p className="max-w-xs text-sm text-muted-foreground">
             Log your first session to start building your streak.
           </p>
-        </div>
-      )}
-
-      {sessions && sessions.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Topic</TableHead>
-                <TableHead className="text-right">Hours</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sessions.map((session) => (
-                <TableRow key={session.id}>
-                  <TableCell className="font-mono text-sm whitespace-nowrap">{session.session_date}</TableCell>
-                  <TableCell>{titleByItemId.get(session.learning_item_id) ?? 'Unknown'}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{session.hours}</TableCell>
-                  <TableCell className="max-w-xs truncate text-muted-foreground">{session.notes ?? '—'}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      aria-label="Delete session"
-                      onClick={() => setDeleteId(session.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </div>
       )}
 

@@ -25,9 +25,22 @@ func NewStudySessionHandler(service *services.StudySessionService) *StudySession
 
 type createSessionRequest struct {
 	LearningItemID string  `json:"learning_item_id" binding:"required"`
-	Hours          float64 `json:"hours" binding:"required"`
+	Hours          *float64 `json:"hours"`
 	Notes          *string `json:"notes"`
-	SessionDate    string  `json:"session_date" binding:"required"`
+	SessionDate    *string `json:"session_date"`
+	ScheduledStart *string `json:"scheduled_start"`
+	ScheduledEnd   *string `json:"scheduled_end"`
+}
+
+type createScheduledSessionRequest struct {
+	LearningItemID string `json:"learning_item_id" binding:"required"`
+	ScheduledStart string `json:"scheduled_start" binding:"required"`
+	ScheduledEnd   string `json:"scheduled_end" binding:"required"`
+}
+
+type confirmSessionRequest struct {
+	Hours *float64 `json:"hours"`
+	Notes *string  `json:"notes"`
 }
 
 type sessionResponse struct {
@@ -36,16 +49,35 @@ type sessionResponse struct {
 	Hours          float64 `json:"hours"`
 	Notes          *string `json:"notes"`
 	SessionDate    string  `json:"session_date"`
+	ScheduledStart *string `json:"scheduled_start"`
+	ScheduledEnd   *string `json:"scheduled_end"`
+	ConfirmedAt    *string `json:"confirmed_at"`
 	CreatedAt      string  `json:"created_at"`
 }
 
 func toSessionResponse(s *models.StudySession) sessionResponse {
+	var scheduledStart, scheduledEnd, confirmedAt *string
+	if s.ScheduledStart != nil {
+		val := s.ScheduledStart.Format(time.RFC3339)
+		scheduledStart = &val
+	}
+	if s.ScheduledEnd != nil {
+		val := s.ScheduledEnd.Format(time.RFC3339)
+		scheduledEnd = &val
+	}
+	if s.ConfirmedAt != nil {
+		val := s.ConfirmedAt.Format(time.RFC3339)
+		confirmedAt = &val
+	}
 	return sessionResponse{
 		ID:             s.ID.String(),
 		LearningItemID: s.LearningItemID.String(),
 		Hours:          s.Hours,
 		Notes:          s.Notes,
 		SessionDate:    s.SessionDate.Format("2006-01-02"),
+		ScheduledStart: scheduledStart,
+		ScheduledEnd:   scheduledEnd,
+		ConfirmedAt:    confirmedAt,
 		CreatedAt:      s.CreatedAt.Format(time.RFC3339),
 	}
 }
@@ -115,7 +147,24 @@ func (h *StudySessionHandler) Create(c *gin.Context) {
 		RespondValidationError(c, errors.New("learning_item_id must be a valid UUID"))
 		return
 	}
-	sessionDate, err := time.Parse("2006-01-02", req.SessionDate)
+
+	// If scheduled_start/end provided, use CreateScheduled path
+	if req.ScheduledStart != nil && req.ScheduledEnd != nil {
+		h.CreateScheduled(c)
+		return
+	}
+
+	// Otherwise, regular retroactive session log (hours + session_date both required)
+	if req.Hours == nil {
+		RespondValidationError(c, errors.New("hours is required for non-scheduled sessions"))
+		return
+	}
+	if req.SessionDate == nil {
+		RespondValidationError(c, errors.New("session_date is required for non-scheduled sessions"))
+		return
+	}
+
+	sessionDate, err := time.Parse("2006-01-02", *req.SessionDate)
 	if err != nil {
 		RespondValidationError(c, errors.New("session_date must be YYYY-MM-DD"))
 		return
@@ -123,7 +172,7 @@ func (h *StudySessionHandler) Create(c *gin.Context) {
 
 	session, svcErr := h.service.Create(userID, services.CreateSessionInput{
 		LearningItemID: itemID,
-		Hours:          req.Hours,
+		Hours:          *req.Hours,
 		Notes:          req.Notes,
 		SessionDate:    sessionDate,
 	})
@@ -132,6 +181,70 @@ func (h *StudySessionHandler) Create(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, toSessionResponse(session))
+}
+
+func (h *StudySessionHandler) CreateScheduled(c *gin.Context) {
+	userID := middleware.UserIDFromContext(c)
+
+	var req createScheduledSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondValidationError(c, err)
+		return
+	}
+
+	itemID, err := uuid.Parse(req.LearningItemID)
+	if err != nil {
+		RespondValidationError(c, errors.New("learning_item_id must be a valid UUID"))
+		return
+	}
+
+	scheduledStart, err := time.Parse(time.RFC3339, req.ScheduledStart)
+	if err != nil {
+		RespondValidationError(c, errors.New("scheduled_start must be RFC3339 formatted"))
+		return
+	}
+
+	scheduledEnd, err := time.Parse(time.RFC3339, req.ScheduledEnd)
+	if err != nil {
+		RespondValidationError(c, errors.New("scheduled_end must be RFC3339 formatted"))
+		return
+	}
+
+	session, svcErr := h.service.CreateScheduled(userID, services.CreateScheduledSessionInput{
+		LearningItemID: itemID,
+		ScheduledStart: scheduledStart,
+		ScheduledEnd:   scheduledEnd,
+	})
+	if svcErr != nil {
+		RespondError(c, svcErr)
+		return
+	}
+	c.JSON(http.StatusCreated, toSessionResponse(session))
+}
+
+func (h *StudySessionHandler) ConfirmScheduled(c *gin.Context) {
+	userID := middleware.UserIDFromContext(c)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		RespondValidationError(c, errors.New("invalid session id"))
+		return
+	}
+
+	var req confirmSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondValidationError(c, err)
+		return
+	}
+
+	session, svcErr := h.service.ConfirmScheduled(userID, sessionID, services.ConfirmScheduledSessionInput{
+		Hours: req.Hours,
+		Notes: req.Notes,
+	})
+	if svcErr != nil {
+		RespondError(c, svcErr)
+		return
+	}
+	c.JSON(http.StatusOK, toSessionResponse(session))
 }
 
 func (h *StudySessionHandler) Delete(c *gin.Context) {

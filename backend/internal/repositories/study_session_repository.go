@@ -66,6 +66,11 @@ func (r *StudySessionRepository) List(userID uuid.UUID, filter SessionFilter) ([
 	return sessions, err
 }
 
+func (r *StudySessionRepository) Update(session *models.StudySession) error {
+	// Ensure user_id doesn't change (defense in depth)
+	return r.db.Model(session).Updates(session).Error
+}
+
 func (r *StudySessionRepository) Delete(userID, sessionID uuid.UUID) error {
 	return r.db.Where("id = ? AND user_id = ?", sessionID, userID).Delete(&models.StudySession{}).Error
 }

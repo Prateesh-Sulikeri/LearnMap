@@ -109,7 +109,7 @@ func (s *DashboardService) GetDashboard(userID uuid.UUID) (*Dashboard, error) {
 		return nil, err
 	}
 
-	recentActivity := buildRecentActivity(allItems, todaysSessions)
+	recentActivity := buildAdaptiveRecentActivity(allItems, todaysSessions, now)
 
 	return &Dashboard{
 		StudyHoursThisWeek:   hoursThisWeek,
@@ -257,7 +257,11 @@ func monthlyPointsFrom(rows []repositories.DailyHours, now time.Time) []StatsPoi
 	return points
 }
 
-func buildRecentActivity(items []models.LearningItem, todaysSessions []models.StudySession) []ActivityPoint {
+// buildAdaptiveRecentActivity shows today's activity if there's >= 10 items,
+// otherwise expands to the past 7 days (ADR-029). This avoids a redundant
+// long-lived activity log now that the calendar provides chronological session
+// tracking and focuses on high-activity days as the most relevant context.
+func buildAdaptiveRecentActivity(items []models.LearningItem, todaysSessions []models.StudySession, now time.Time) []ActivityPoint {
 	titleByItemID := make(map[uuid.UUID]string, len(items))
 	for _, item := range items {
 		titleByItemID[item.ID] = item.Title
@@ -266,9 +270,32 @@ func buildRecentActivity(items []models.LearningItem, todaysSessions []models.St
 	// Must stay a non-nil slice even when both inputs are empty (e.g. a
 	// brand-new user) — a nil slice marshals to JSON `null`, and the
 	// frontend calls `.length` on this unconditionally.
-	activity := make([]ActivityPoint, 0, len(items)+len(todaysSessions))
+	todayActivity := make([]ActivityPoint, 0, len(items)+len(todaysSessions))
 	for _, item := range items {
-		activity = append(activity, ActivityPoint{Type: "item_updated", Title: item.Title, Timestamp: item.UpdatedAt})
+		todayActivity = append(todayActivity, ActivityPoint{Type: "item_updated", Title: item.Title, Timestamp: item.UpdatedAt})
+	}
+	for _, session := range todaysSessions {
+		todayActivity = append(todayActivity, ActivityPoint{Type: "session_logged", Title: titleByItemID[session.LearningItemID], Timestamp: session.CreatedAt})
+	}
+
+	// If today has a lot of activity (threshold: 10), show just today
+	if len(todayActivity) >= 10 {
+		sort.Slice(todayActivity, func(i, j int) bool { return todayActivity[i].Timestamp.After(todayActivity[j].Timestamp) })
+		if len(todayActivity) > 10 {
+			todayActivity = todayActivity[:10]
+		}
+		return todayActivity
+	}
+
+	// Otherwise, expand to past 7 days: show items updated in the last 7 days
+	// + all today's sessions
+	sevenDaysAgo := startOfDay(now).AddDate(0, 0, -6)
+	activity := make([]ActivityPoint, 0, len(items)+len(todaysSessions))
+
+	for _, item := range items {
+		if !item.UpdatedAt.Before(sevenDaysAgo) {
+			activity = append(activity, ActivityPoint{Type: "item_updated", Title: item.Title, Timestamp: item.UpdatedAt})
+		}
 	}
 	for _, session := range todaysSessions {
 		activity = append(activity, ActivityPoint{Type: "session_logged", Title: titleByItemID[session.LearningItemID], Timestamp: session.CreatedAt})

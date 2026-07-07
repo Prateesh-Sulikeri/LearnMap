@@ -11,13 +11,20 @@ import (
 // LearningItemID's owner — intentional defense in depth (ADR-011) so every
 // query can filter WHERE user_id = ? without depending on a join being
 // written correctly every time.
+//
+// Scheduling fields (ScheduledStart/ScheduledEnd/ConfirmedAt) enable future-dated
+// sessions (honor system). Existing retroactively-logged sessions (Hours set, others null)
+// are always shown as complete.
 type StudySession struct {
-	ID             uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID         uuid.UUID `gorm:"type:uuid;not null;index"`
-	LearningItemID uuid.UUID `gorm:"type:uuid;not null;index"`
-	Hours          float64   `gorm:"not null"`
+	ID             uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	UserID         uuid.UUID  `gorm:"type:uuid;not null;index"`
+	LearningItemID uuid.UUID  `gorm:"type:uuid;not null;index"`
+	Hours          float64    `gorm:"not null"`
 	Notes          *string
-	SessionDate    time.Time `gorm:"type:date;not null"`
+	SessionDate    time.Time  `gorm:"type:date;not null"`
+	ScheduledStart *time.Time // nullable: null for retroactively-logged sessions
+	ScheduledEnd   *time.Time // nullable: when scheduled session was due
+	ConfirmedAt    *time.Time // nullable: when scheduled session was marked complete
 	CreatedAt      time.Time
 	DeletedAt      gorm.DeletedAt `gorm:"index"`
 }

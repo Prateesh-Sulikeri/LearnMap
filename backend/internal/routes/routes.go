@@ -71,6 +71,7 @@ func Register(router *gin.Engine, deps Dependencies) {
 
 		protected.GET("/sessions", deps.SessionHandler.List)
 		protected.POST("/sessions", deps.SessionHandler.Create)
+		protected.POST("/sessions/:id/confirm", deps.SessionHandler.ConfirmScheduled)
 		protected.DELETE("/sessions/:id", deps.SessionHandler.Delete)
 
 		protected.GET("/dashboard", deps.DashboardHandler.GetDashboard)

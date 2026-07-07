@@ -97,14 +97,24 @@ export interface StudySession {
   hours: number
   notes: string | null
   session_date: string
+  scheduled_start: string | null
+  scheduled_end: string | null
+  confirmed_at: string | null
   created_at: string
 }
 
 export interface CreateSessionRequest {
   learning_item_id: string
-  hours: number
+  hours?: number
   notes?: string
-  session_date: string
+  session_date?: string
+  scheduled_start?: string
+  scheduled_end?: string
+}
+
+export interface ConfirmSessionRequest {
+  hours?: number
+  notes?: string
 }
 
 export interface SessionFilter {
