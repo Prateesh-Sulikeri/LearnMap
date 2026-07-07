@@ -88,7 +88,7 @@ export default function AppLayout() {
   const RankIcon = rank.icon
 
   return (
-    <div className="h-screen overflow-hidden bg-background md:flex">
+    <div className="flex h-screen flex-col overflow-hidden bg-background md:flex-row">
       {/* Sidebar nav — tablet/desktop (md and up), collapsible to icon-only.
           Scrolls independently of the main content (its own overflow-y-auto)
           so it never gets carried away by a tall page — the outer shell is
