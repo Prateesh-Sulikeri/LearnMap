@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Circle, CircleCheck, Clock, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, Circle, CircleCheck, Clock, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { itemsApi } from '@/services/itemsApi'
 import { getApiErrorMessage } from '@/utils/apiError'
@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { TreeGuides } from '@/components/tree/TreeGuides'
 import { NoteIndicator } from '@/components/tree/NoteIndicator'
-import { NumberBadge } from '@/components/tree/NumberBadge'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
 import { DeleteItemDialog } from '@/components/DeleteItemDialog'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
@@ -28,8 +27,6 @@ interface TreeNodeProps {
   onToggle: (id: string) => void
   /** Opens the shared, page-level notes editor for the given item id. */
   onOpenNotes: (id: string) => void
-  /** "1"/"1a"/"1a1"-style label per node id, computed once for the whole visible tree. */
-  numbering: Map<string, string>
   /** Whether this node is the last child among its siblings (see TreeGuides). */
   isLast: boolean
   /** Ancestor continuation guides inherited from the parent (see TreeGuides). */
@@ -41,7 +38,7 @@ interface TreeNodeProps {
 // horizontal space — the "adapted interaction pattern for narrow screens"
 // the roadmap calls for on this page. Connector guide lines (TreeGuides)
 // give the nesting an actual visual tree structure, not just indentation.
-export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, numbering, isLast, ancestorLines }: TreeNodeProps) {
+export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, isLast, ancestorLines }: TreeNodeProps) {
   const hasChildren = node.children.length > 0
   const collapsed = isCollapsed(node.id)
   const completed = node.status === 'completed'
@@ -58,6 +55,12 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, numb
       void queryClient.invalidateQueries({ queryKey: ['items'] })
       toast.success(completed ? 'Reopened' : 'Marked complete')
     },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
+  })
+
+  const toggleFavorite = useMutation({
+    mutationFn: () => itemsApi.setFavorite(node.id, !node.is_favorite),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['items'] }),
     onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
 
@@ -98,8 +101,6 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, numb
             )}
           </button>
 
-          <NumberBadge label={numbering.get(node.id) ?? ''} />
-
           {/* Clicking the title toggles expand/collapse too — the chevron shouldn't be the only hit target. */}
           <button
             type="button"
@@ -113,6 +114,16 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, numb
             {node.title}
           </button>
           <NoteIndicator note={node.description} onClick={() => onOpenNotes(node.id)} />
+          <button
+            type="button"
+            onClick={() => toggleFavorite.mutate()}
+            disabled={toggleFavorite.isPending}
+            aria-label={node.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+            className="shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 data-[active=true]:opacity-100"
+            data-active={node.is_favorite}
+          >
+            <Star className={cn('size-4', node.is_favorite ? 'fill-primary text-primary' : 'text-muted-foreground')} />
+          </button>
         </div>
 
         <Tooltip>
@@ -159,7 +170,6 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, numb
               isCollapsed={isCollapsed}
               onToggle={onToggle}
               onOpenNotes={onOpenNotes}
-              numbering={numbering}
               isLast={index === node.children.length - 1}
               ancestorLines={[...ancestorLines, !isLast]}
             />

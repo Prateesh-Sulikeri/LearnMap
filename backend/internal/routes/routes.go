@@ -58,6 +58,7 @@ func Register(router *gin.Engine, deps Dependencies) {
 		protected.DELETE("/items/trash", deps.ItemHandler.EmptyTrash)
 		protected.PUT("/items/:id", deps.ItemHandler.Update)
 		protected.PATCH("/items/:id/status", deps.ItemHandler.SetStatus)
+		protected.PATCH("/items/:id/favorite", deps.ItemHandler.SetFavorite)
 		protected.POST("/items/:id/restore", deps.ItemHandler.Restore)
 		protected.DELETE("/items/:id", deps.ItemHandler.Delete)
 		protected.DELETE("/items/:id/permanent", deps.ItemHandler.DeletePermanently)

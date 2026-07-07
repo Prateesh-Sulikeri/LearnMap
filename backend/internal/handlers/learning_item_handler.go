@@ -38,6 +38,10 @@ type setStatusRequest struct {
 	Status string `json:"status" binding:"required"`
 }
 
+type setFavoriteRequest struct {
+	Favorite bool `json:"favorite"`
+}
+
 type itemResponse struct {
 	ID          string  `json:"id"`
 	ParentID    *string `json:"parent_id"`
@@ -46,6 +50,7 @@ type itemResponse struct {
 	Status      string  `json:"status"`
 	Deadline    *string `json:"deadline"`
 	Position    int     `json:"position"`
+	IsFavorite  bool    `json:"is_favorite"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
 	CompletedAt *string `json:"completed_at"`
@@ -75,6 +80,7 @@ func toItemResponse(item *models.LearningItem) itemResponse {
 		Status:      string(item.Status),
 		Deadline:    deadline,
 		Position:    item.Position,
+		IsFavorite:  item.IsFavorite,
 		CreatedAt:   item.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   item.UpdatedAt.Format(time.RFC3339),
 		CompletedAt: completedAt,
@@ -177,6 +183,28 @@ func (h *LearningItemHandler) SetStatus(c *gin.Context) {
 	}
 
 	item, svcErr := h.service.SetStatus(userID, itemID, models.LearningItemStatus(req.Status))
+	if svcErr != nil {
+		RespondError(c, svcErr)
+		return
+	}
+	c.JSON(http.StatusOK, toItemResponse(item))
+}
+
+func (h *LearningItemHandler) SetFavorite(c *gin.Context) {
+	userID := middleware.UserIDFromContext(c)
+	itemID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		RespondValidationError(c, errors.New("invalid item id"))
+		return
+	}
+
+	var req setFavoriteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondValidationError(c, err)
+		return
+	}
+
+	item, svcErr := h.service.SetFavorite(userID, itemID, req.Favorite)
 	if svcErr != nil {
 		RespondError(c, svcErr)
 		return

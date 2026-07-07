@@ -26,7 +26,8 @@ type LearningItem struct {
 	Description *string
 	Status      LearningItemStatus `gorm:"type:text;not null;default:'not_started'"`
 	Deadline    *time.Time
-	Position    int `gorm:"not null;default:0"`
+	Position    int  `gorm:"not null;default:0"`
+	IsFavorite  bool `gorm:"not null;default:false"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	CompletedAt *time.Time

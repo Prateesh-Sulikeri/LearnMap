@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Circle, CircleCheck, Clock, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Circle, CircleCheck, Clock, MoreHorizontal, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { itemsApi } from '@/services/itemsApi'
 import { getApiErrorMessage } from '@/utils/apiError'
@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { NoteIndicator } from '@/components/tree/NoteIndicator'
-import { NumberBadge } from '@/components/tree/NumberBadge'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
 import { DeleteItemDialog } from '@/components/DeleteItemDialog'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
@@ -25,11 +24,9 @@ interface OrgChartNodeProps {
   isCollapsed: (id: string) => boolean
   onToggle: (id: string) => void
   onOpenNotes: (id: string) => void
-  /** "1"/"1a"/"1a1"-style label per node id, computed once for the whole visible tree. */
-  numbering: Map<string, string>
 }
 
-export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes, numbering }: OrgChartNodeProps) {
+export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes }: OrgChartNodeProps) {
   const hasChildren = node.children.length > 0
   const collapsed = isCollapsed(node.id)
   const completed = node.status === 'completed'
@@ -50,9 +47,15 @@ export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes, numberi
     onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
 
+  const toggleFavorite = useMutation({
+    mutationFn: () => itemsApi.setFavorite(node.id, !node.is_favorite),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['items'] }),
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
+  })
+
   return (
     <li>
-      <div className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card py-1.5 pr-1 pl-2 text-sm whitespace-nowrap shadow-sm">
+      <div className="group inline-flex items-center gap-1.5 rounded-xl border border-border bg-card py-1.5 pr-1 pl-2 text-sm whitespace-nowrap shadow-sm">
         <button
           type="button"
           onClick={() => toggleStatus.mutate()}
@@ -67,8 +70,6 @@ export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes, numberi
           )}
         </button>
 
-        <NumberBadge label={numbering.get(node.id) ?? ''} />
-
         <button
           type="button"
           onClick={() => hasChildren && onToggle(node.id)}
@@ -78,6 +79,17 @@ export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes, numberi
         </button>
 
         <NoteIndicator note={node.description} onClick={() => onOpenNotes(node.id)} />
+
+        <button
+          type="button"
+          onClick={() => toggleFavorite.mutate()}
+          disabled={toggleFavorite.isPending}
+          aria-label={node.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+          className="shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 data-[active=true]:opacity-100"
+          data-active={node.is_favorite}
+        >
+          <Star className={cn('size-3.5', node.is_favorite ? 'fill-primary text-primary' : 'text-muted-foreground')} />
+        </button>
 
         {hasChildren && (
           <span className="font-mono text-xs text-muted-foreground">
@@ -133,14 +145,7 @@ export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes, numberi
       {hasChildren && !collapsed && (
         <ul>
           {node.children.map((child) => (
-            <OrgChartNode
-              key={child.id}
-              node={child}
-              isCollapsed={isCollapsed}
-              onToggle={onToggle}
-              onOpenNotes={onOpenNotes}
-              numbering={numbering}
-            />
+            <OrgChartNode key={child.id} node={child} isCollapsed={isCollapsed} onToggle={onToggle} onOpenNotes={onOpenNotes} />
           ))}
         </ul>
       )}

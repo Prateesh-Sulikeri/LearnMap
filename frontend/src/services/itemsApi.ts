@@ -17,6 +17,8 @@ export const itemsApi = {
     apiClient.put<LearningItem>(`/items/${id}`, data).then((r) => r.data),
   setStatus: (id: string, data: SetStatusRequest) =>
     apiClient.patch<LearningItem>(`/items/${id}/status`, data).then((r) => r.data),
+  setFavorite: (id: string, favorite: boolean) =>
+    apiClient.patch<LearningItem>(`/items/${id}/favorite`, { favorite }).then((r) => r.data),
   remove: (id: string) =>
     apiClient.delete<DeleteItemResponse>(`/items/${id}`).then((r) => r.data),
   listTrash: () => apiClient.get<TrashedItem[]>('/items/trash').then((r) => r.data),

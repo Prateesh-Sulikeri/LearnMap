@@ -51,10 +51,11 @@ function getBreadcrumbs(pathname: string, search: string): Crumb[] {
   const params = new URLSearchParams(search)
 
   if (pathname === '/tree') {
-    const tab = params.get('tab') === 'completed' ? 'completed' : 'active'
+    const tabParam = params.get('tab')
+    const tab = tabParam === 'completed' ? 'completed' : tabParam === 'favs' ? 'favs' : 'active'
     const q = params.get('q')
-    const tabLabel = tab === 'completed' ? 'Completed' : 'Active'
-    const tabHref = tab === 'completed' ? '/tree?tab=completed' : '/tree'
+    const tabLabel = tab === 'completed' ? 'Completed' : tab === 'favs' ? 'Favs' : 'Active'
+    const tabHref = tab === 'active' ? '/tree' : `/tree?tab=${tab}`
     if (q) {
       return [home, { label: 'Learning', to: '/tree' }, { label: tabLabel, to: tabHref }, { label: q }]
     }

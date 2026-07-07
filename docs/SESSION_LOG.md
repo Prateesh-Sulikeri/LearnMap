@@ -215,3 +215,29 @@ Drag-and-drop reordering (also mentioned in the same Todo, alongside "add sub-it
 **Problems encountered and resolved:** The auto-save/tab-reset interaction bug above. A syntax error (missing closing paren) in the first draft of `noteExport.ts`'s `slugify`, caught by the build immediately. Mid-session, the `OrgChartNode`/`OrgChartTree` files were observed briefly reverted to a pre-numbering state (apparent manual exploration in the user's editor) and restored to the working version before continuing.
 
 **Next recommended task:** `docs/Todo` is now fully worked through (each item done, explicitly scoped down with the user's input, or explicitly deferred with a stated reason) — safe to clear or archive. Otherwise, Milestone 4 (Charts & Statistics) remains the next planned formal milestone.
+
+---
+
+## 2026-07-07 — Follow-up fixes: trash routing bug, numbering scope, Favs tab
+
+**Summary:** Direct feedback on the previous round surfaced one real bug and several scope corrections.
+
+**Bug found and fixed:** "Trash clear from UI is not working." Root-caused via live `curl` against the running dev backend rather than guessing: `DELETE /items/trash` and `DELETE /items/:id/permanent` (both added last round) were returning "invalid item id" / 404 — but `docker logs learnmap-backend` after a restart showed both routes registered correctly, and re-testing post-restart proved both work end to end. The actual cause: `go run` doesn't hot-reload (documented in `backend/README.md`, easy to forget mid-session) — the container had been running the pre-trash-endpoints binary the whole time. Restarted it; no code was actually broken.
+
+**Scope corrections from direct feedback, all implemented:**
+- Numbering badges pulled back out of the list and org-chart views entirely — they only belong in the notes focus-mode side tree, per explicit instruction ("I dont want numbers on the org tree only in the focus mode of notes"). `TreeNode`/`OrgChartNode`/`OrgChartTree` no longer take a `numbering` prop.
+- `NumberBadge` was a fixed `size-7` square — now `h-5 min-w-5` with horizontal padding, so it grows into a pill for longer labels ("10a2") instead of clipping.
+- The export-as-markdown option existed but was invisible — one of four bare icon buttons crammed into the notes-editor header. Consolidated Add-sub-item and both Export actions into a single "..." dropdown with icon+text items, keeping only status-toggle and focus-mode-toggle as standalone icons — the exact same discoverability fix already applied once this session to `TreeNode`'s actions menu (task #25), reapplied here.
+- Added a visible clear (X) button to the Learning page's search input.
+- Redesigned the Learning page's tabs per explicit spec: Active now shows *everything* (previously it excluded completed items), Completed is unchanged (only completed top-level topics), and a new Favs tab shows a flat list of favorited items at any depth (not root-level-only, since a favorite can be a deeply nested sub-item). Favs intentionally has no List/Map toggle or nested tree — just a flat, minimal row list, per "simple nothing complex."
+- Added `is_favorite` end to end: new migration (`000007`, `ALTER TABLE learning_items ADD COLUMN is_favorite BOOLEAN NOT NULL DEFAULT false`), model field, `PATCH /items/:id/favorite`, a star toggle button (hover-revealed unless already favorited) on both `TreeNode` and `OrgChartNode` rows.
+
+**Verification:** Backend — migration applied cleanly on both the test DB (via `SetupTestDB`) and the live dev DB (via container restart, confirmed with `curl` against `/items` showing `is_favorite` in the response and the toggle endpoint working, then reverted the test toggle so live data wasn't left dirty); full `go test ./... -p 1` green with two new `SetFavorite` service tests. Frontend — build/lint clean after every change.
+
+**Files created:** `backend/migrations/000007_add_learning_items_favorite.{up,down}.sql`, `frontend/src/components/tree/FavoritesList.tsx`.
+
+**Files modified:** `backend/internal/models/learning_item.go`, `backend/internal/{repositories,services,handlers}/learning_item_*.go` (favorite), `backend/internal/routes/routes.go`; `frontend/src/{types/api,services/itemsApi}.ts`, `frontend/src/components/{TreeNode,tree/OrgChartNode,tree/OrgChartTree,tree/NumberBadge,notes/NotesEditorDialog}.tsx`, `frontend/src/pages/LearningTreePage.tsx`, `frontend/src/layouts/AppLayout.tsx`.
+
+**Problems encountered and resolved:** The stale-container issue above — worth remembering that every backend route/handler change needs `docker restart learnmap-backend` before it's actually live, not just a successful `go build`.
+
+**Next recommended task:** Milestone 4 (Charts & Statistics) remains the next planned formal milestone. No other open items from user feedback as of this entry.

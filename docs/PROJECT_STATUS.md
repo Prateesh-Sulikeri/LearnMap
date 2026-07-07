@@ -1,6 +1,6 @@
 # LearnMap.app — Project Status
 
-**Last updated:** 2026-07-07 (notes-system Todo pass)
+**Last updated:** 2026-07-07 (follow-up fixes round)
 
 ## Current Milestone
 Milestone 4 — Charts & Statistics (not started; a substantial UX/feature pass happened first — see below)
@@ -35,13 +35,21 @@ Hosted, multi-user learning tracker with authentication and profiles, used from 
 - Copy-code "Copied!" confirmation; markdown-help text hidden outside Write mode
 - Save behavior fixed: saving while in focus mode now persists without exiting/closing (previously always closed); mark-complete/reopen and "add sub-item" now work from inside the notes editor (focus mode or not)
 - Ctrl/Cmd+S saves (browser's own Save Page prevented); debounced auto-save after ~2.5s idle; any close path (Cancel, backdrop, Escape) saves first if there's unsaved work
-- Hierarchical numbering ("1"/"1a"/"1a1"-style, alternating numeric/alpha per depth) shown as circular badges on every tree view (list, org-chart, focus-mode side tree); the focus-mode side tree, when collapsed, shows a thin rail of just the badges instead of nothing
+- Hierarchical numbering ("1"/"1a"/"1a1"-style, alternating numeric/alpha per depth) shown as circular badges; **since pulled back to the focus-mode side tree only** (see the follow-up round below) — the collapsed side tree still shows a thin rail of just the badges instead of nothing
 - Rich markdown: GFM (tables, task lists, strikethrough) via `remark-gfm`, syntax-highlighted code blocks via `rehype-highlight` with a small custom light-theme palette (not UI semantic colors, to avoid e.g. a number literal reading as an error); image size presets (Small/Medium/Large/Original) via the standard markdown title-attribute slot, no raw HTML
 - Trash: "Empty Trash" (with confirmation) and per-item "delete permanently", plus a lazy 7-day retention sweep (hard-deletes anything past the retention window on the next `ListTrash` call — no job scheduler exists in this project, so read-time enforcement stands in for one)
 - Functional breadcrumbs: every segment but the last is a real link; the Learning page's Active/Completed tab and search query moved from local state into URL search params so "Learning / Completed" is an actual shareable link, not just a label
 - Markdown export: a single note as a `.md` download, or a whole topic (root + every descendant) as one combined `.md` "notebook" with a generated table of contents — scoped down from the original ask (PDF/DOCX/.zip) per an explicit user decision to keep this batch lightweight; no new heavy dependencies
 
 Three items from the same Todo were explicitly scoped down or deferred after asking the user directly (all picked the lighter option): no interactive/WYSIWYG-editable preview (checkboxes/tables/images stay read-only in Preview — reversing this was declined, keeping the original "markdown + toolbar, not WYSIWYG" decision intact); no PDF/DOCX/.zip export; no raw-HTML/drag-handle image resizing. Drag-and-drop reordering of tree items (also mentioned in the same Todo) was deferred without asking, as a separate, larger feature (needs a DnD library + a new backend endpoint to persist reordered `position`/`parent_id`).
+
+**Follow-up fixes (2026-07-07)**, direct feedback on the round above:
+- Fixed a real (if brief) bug: "Empty Trash"/permanent-delete appeared not to work — actually a stale backend container that hadn't been restarted since those routes were added (`go run` doesn't hot-reload). No code was broken; restarting fixed it immediately, confirmed via live `curl` before and after.
+- Numbering badges removed from the list and org-chart tree views — now shown only in the notes focus-mode side tree, per direct instruction.
+- `NumberBadge` now grows into a pill for longer labels instead of a fixed-size circle that clipped them.
+- Notes-editor header actions consolidated into a single "..." dropdown (was 4 unlabeled icon buttons, including the previously-invisible export option) — the same discoverability fix already applied once this session to the tree row's actions menu.
+- Added a clear (X) button to the Learning page search input.
+- Learning page tabs redesigned: Active now shows every item regardless of status (previously excluded completed ones); Completed unchanged; new Favs tab (flat list, any depth, user-toggled via a hover-revealed star on each row) — backed by a new `is_favorite` column, migration, and `PATCH /items/:id/favorite` endpoint.
 
 ## Features In Progress
 None — Milestone 4 not yet started.

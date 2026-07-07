@@ -9,6 +9,7 @@ import {
   ListTree,
   Maximize2,
   Minimize2,
+  MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
   PenLine,
@@ -275,45 +276,6 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
                     variant="ghost"
                     size="icon-sm"
                     className="shrink-0"
-                    onClick={() => setAddChildOpen(true)}
-                    disabled={!node}
-                  />
-                }
-              >
-                <Plus className="size-4" />
-              </TooltipTrigger>
-              <TooltipContent>Add sub-item</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={<Button type="button" variant="ghost" size="icon-sm" disabled={!node} />}
-                  >
-                    <Download className="size-4" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => node && exportNoteAsMarkdown({ ...node, description: value })}>
-                      Export this note (.md)
-                    </DropdownMenuItem>
-                    {rootAncestor && (
-                      <DropdownMenuItem onClick={() => exportTopicAsMarkdown(rootAncestor)}>
-                        Export whole topic (.md)
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TooltipTrigger>
-              <TooltipContent>Export as markdown</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="shrink-0"
                     onClick={() => (focusMode ? setFocusMode(false) : enterFocusMode())}
                   />
                 }
@@ -321,6 +283,42 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
                 {focusMode ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
               </TooltipTrigger>
               <TooltipContent>{focusMode ? 'Exit focus mode' : 'Focus mode'}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button variant="ghost" size="icon-sm" aria-label="More actions" disabled={!node} />
+                    }
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setAddChildOpen(true)} className="flex items-center gap-3">
+                      <Plus className="size-4" />
+                      Add sub-item
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => node && exportNoteAsMarkdown({ ...node, description: value })}
+                      className="flex items-center gap-3"
+                    >
+                      <Download className="size-4" />
+                      Export this note (.md)
+                    </DropdownMenuItem>
+                    {rootAncestor && (
+                      <DropdownMenuItem
+                        onClick={() => exportTopicAsMarkdown(rootAncestor)}
+                        className="flex items-center gap-3"
+                      >
+                        <Download className="size-4" />
+                        Export whole topic (.md)
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TooltipTrigger>
+              <TooltipContent>More actions</TooltipContent>
             </Tooltip>
           </div>
           {tab === 'write' && (

@@ -140,6 +140,25 @@ func (s *LearningItemService) SetStatus(userID, itemID uuid.UUID, status models.
 	return item, nil
 }
 
+// SetFavorite toggles whether itemID shows up in the Favs tab — a plain
+// user-chosen flag, independent of status (a favorite can be active or
+// completed) and independent of the tree position (no cascade to children).
+func (s *LearningItemService) SetFavorite(userID, itemID uuid.UUID, favorite bool) (*models.LearningItem, error) {
+	item, err := s.items.GetByID(userID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if item == nil {
+		return nil, apperror.NotFound("learning item not found")
+	}
+
+	item.IsFavorite = favorite
+	if err := s.items.Update(item); err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
 // Delete soft-deletes itemID and every descendant, plus their study sessions,
 // and returns how many items were affected (for the frontend's confirmation UI).
 func (s *LearningItemService) Delete(userID, itemID uuid.UUID) (int, error) {

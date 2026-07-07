@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Follow-up fixes: trash routing, numbering scope, Favs tab (2026-07-07)
+- Fixed: "Empty Trash" and permanent delete appeared broken from the UI — actually a stale running backend container (routes were correct in code, just not yet restarted to pick them up); no code fix needed, just a restart.
+- Changed: hierarchical numbering badges removed from the list and org-chart tree views — they now only appear in the notes focus-mode side tree, per direct feedback.
+- Fixed: `NumberBadge` was a fixed-size circle that would clip longer labels; now grows into a pill for labels beyond 1-2 characters.
+- Fixed: the export-as-markdown option was invisible, buried as one of four unlabeled icon buttons in the notes editor header. Consolidated into a single "..." dropdown with icon+text items (add sub-item, export note, export topic), matching the same discoverability fix already applied once this session to the tree row actions menu.
+- Added a clear (X) button to the Learning page's search input.
+- Changed: Learning page tabs redesigned — Active now shows every item regardless of status (previously it excluded completed ones); Completed is unchanged; added a new Favs tab, a flat list of favorited items at any depth in the tree.
+- Added `is_favorite` on learning items end to end: migration, model field, `PATCH /items/:id/favorite`, and a hover-revealed star toggle on tree rows.
+
 ### Notes-system Todo pass, streak ranks, and focus mode (2026-07-07)
 - Added a streak rank system (7 fire-themed tiers keyed off `current_streak`): badge on the Profile stat card, an all-ranks reference dialog, rank shown in the sidebar.
 - Added focus mode for notes: fullscreen editing with a side tree of the whole topic, collapsible, defaulting to Preview. Renders via a `createPortal` straight onto `document.body` rather than through the Dialog primitive, after two CSS-based fullscreen attempts both proved unreliable in the browser.

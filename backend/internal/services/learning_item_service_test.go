@@ -188,6 +188,36 @@ func TestLearningItemService_Restore_RejectsAnotherUsersDeletedItem(t *testing.T
 	require.Nil(t, got, "the item must remain deleted after Bob's failed restore attempt")
 }
 
+func TestLearningItemService_SetFavorite_TogglesIndependentlyOfStatus(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+
+	item, err := deps.items.Create(userA, services.CreateItemInput{Title: "Kafka"})
+	require.NoError(t, err)
+	require.False(t, item.IsFavorite)
+
+	favorited, err := deps.items.SetFavorite(userA, item.ID, true)
+	require.NoError(t, err)
+	require.True(t, favorited.IsFavorite)
+	require.Equal(t, models.StatusNotStarted, favorited.Status, "favoriting must not touch status")
+
+	unfavorited, err := deps.items.SetFavorite(userA, item.ID, false)
+	require.NoError(t, err)
+	require.False(t, unfavorited.IsFavorite)
+}
+
+func TestLearningItemService_SetFavorite_RejectsAnotherUsersItem(t *testing.T) {
+	deps, createUser := setupItemService(t)
+	userA := createUser("alice@example.com")
+	userB := createUser("bob@example.com")
+
+	item, err := deps.items.Create(userA, services.CreateItemInput{Title: "Alice's item"})
+	require.NoError(t, err)
+
+	_, err = deps.items.SetFavorite(userB, item.ID, true)
+	require.Error(t, err, "Bob must not be able to favorite Alice's item")
+}
+
 func TestLearningItemService_DeletePermanently_HardDeletesWholeSubtree(t *testing.T) {
 	deps, createUser := setupItemService(t)
 	userA := createUser("alice@example.com")

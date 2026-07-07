@@ -157,12 +157,13 @@ Index: `(user_id)`, `(token_hash)`.
 | status        | TEXT        | NOT NULL DEFAULT 'not_started'; CHECK IN ('not_started','in_progress','completed') |
 | deadline      | TIMESTAMPTZ | nullable                                                               |
 | position      | INTEGER     | NOT NULL DEFAULT 0 — sibling ordering, future drag-reorder ready       |
+| is_favorite   | BOOLEAN     | NOT NULL DEFAULT false — user-chosen, independent of status/position (migration 000007) |
 | created_at    | TIMESTAMPTZ | NOT NULL DEFAULT now()                                                 |
 | updated_at    | TIMESTAMPTZ | NOT NULL DEFAULT now()                                                 |
 | completed_at  | TIMESTAMPTZ | nullable                                                               |
 | deleted_at    | TIMESTAMPTZ | nullable — soft delete                                                 |
 
-Indexes: `(user_id)`, `(user_id, parent_id)`, `(user_id, status)`, `(deleted_at)`.
+Indexes: `(user_id)`, `(user_id, parent_id)`, `(user_id, status)`, `(deleted_at)`, `(user_id, is_favorite)`.
 
 ### `study_sessions`
 
@@ -210,6 +211,7 @@ Base path `/api/v1`. All routes except `auth/register`, `auth/login`, `auth/refr
 | POST   | /items                       | yes  | create item                                |
 | PUT    | /items/:id                   | yes  | update title/description/deadline         |
 | PATCH  | /items/:id/status             | yes  | mark complete / reopen                    |
+| PATCH  | /items/:id/favorite            | yes  | toggle is_favorite (independent of status) |
 | DELETE | /items/:id                    | yes  | soft-delete item + descendants + sessions |
 | GET    | /sessions                     | yes  | list caller's sessions (filterable)       |
 | POST   | /sessions                      | yes  | log a session                              |
