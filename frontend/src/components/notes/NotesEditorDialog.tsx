@@ -222,7 +222,7 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
                   label={topicNumbering.get(entry.id) ?? ''}
                   className={cn(
                     entry.id === node?.id && 'bg-primary text-primary-foreground',
-                    entry.status === 'completed' && entry.id !== node?.id && 'bg-success/15 text-success',
+                    entry.status === 'completed' && entry.id !== node?.id && 'bg-success/15 text-success-text',
                   )}
                 />
               </TooltipTrigger>
@@ -263,7 +263,7 @@ export function NotesEditorDialog({ node, rootAncestor, onOpenChange, onNavigate
             <p
               className={cn(
                 'min-w-0 flex-1 truncate font-heading text-base leading-none font-medium',
-                completed && 'text-success line-through decoration-success/50',
+                completed && 'text-success-text line-through decoration-success-text/50',
               )}
             >
               {node?.title ?? 'Notes'}
@@ -468,7 +468,7 @@ function TOCEntry({
         className={cn(
           'flex items-center gap-1.5 text-left text-sm hover:underline',
           isActive ? 'font-semibold text-foreground' : 'text-accent-hover',
-          node.status === 'completed' && 'text-success line-through decoration-success/50',
+          node.status === 'completed' && 'text-success-text line-through decoration-success-text/50',
         )}
       >
         <NumberBadge label={numbering.get(node.id) ?? ''} />

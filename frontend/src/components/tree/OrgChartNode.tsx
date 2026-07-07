@@ -75,7 +75,7 @@ export function OrgChartNode({ node, isCollapsed, onToggle, onOpenNotes, isRoot 
         <button
           type="button"
           onClick={() => hasChildren && onToggle(node.id)}
-          className={cn(hasChildren && 'cursor-pointer', completed && 'text-success line-through decoration-success/50')}
+          className={cn(hasChildren && 'cursor-pointer', completed && 'text-success-text line-through decoration-success-text/50')}
         >
           {node.title}
         </button>

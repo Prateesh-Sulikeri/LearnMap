@@ -83,7 +83,7 @@ export function SessionDetailsDialog({
                   </p>
                 )}
                 {status === 'in_progress' && (
-                  <p className="text-xs text-warning font-semibold">IN PROGRESS — awaiting confirmation</p>
+                  <p className="text-xs text-warning-text font-semibold">IN PROGRESS — awaiting confirmation</p>
                 )}
                 {status === 'expired' && (
                   <p className="text-xs text-destructive font-semibold">EXPIRED — not confirmed</p>

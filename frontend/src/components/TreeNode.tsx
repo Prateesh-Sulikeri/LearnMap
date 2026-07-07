@@ -108,7 +108,7 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, onOpenNotes, isLa
             className={cn(
               'truncate text-left text-sm',
               hasChildren && 'cursor-pointer',
-              completed && 'text-success line-through decoration-success/50',
+              completed && 'text-success-text line-through decoration-success-text/50',
             )}
           >
             {node.title}

@@ -31,7 +31,7 @@ export default function StudySessionsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [confirmSession, setConfirmSession] = useState<StudySession | null>(null)
   const [detailsSession, setDetailsSession] = useState<StudySession | null>(null)
-  const [calendarView, setCalendarView] = useState<View>('week')
+  const [calendarView, setCalendarView] = useState<View>('month')
   const [calendarDate, setCalendarDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<Date>(getStartOfToday())
 
@@ -170,7 +170,7 @@ export default function StudySessionsPage() {
                         <p className="text-xs text-destructive font-semibold mt-1">Not confirmed</p>
                       )}
                       {status === 'in_progress' && (
-                        <p className="text-xs text-warning font-semibold mt-1">In progress</p>
+                        <p className="text-xs text-warning-text font-semibold mt-1">In progress</p>
                       )}
                       {status === 'upcoming' && (
                         <p className="text-xs text-muted-foreground font-semibold mt-1">Upcoming</p>

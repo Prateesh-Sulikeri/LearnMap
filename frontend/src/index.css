@@ -22,6 +22,8 @@
 
     --color-success: var(--success);
     --color-warning: var(--warning);
+    --color-success-text: var(--success-text);
+    --color-warning-text: var(--warning-text);
     --color-accent-hover: var(--accent-hover);
     --color-tree-line: var(--tree-line);
 
@@ -93,6 +95,15 @@
     --success: #22C55E;
     --warning: #F97316;
     --destructive: #EF4444;
+    /* success/warning at full saturation read fine as icon fills (~2.2:1
+       and ~2.8:1 against the background) but fail WCAG AA (4.5:1) as actual
+       text — a completed item's strikethrough title, or an "In progress"
+       label, both render real words in these colors. These darker steps of
+       the same hue are for text/decoration specifically; icons keep using
+       --success/--warning unchanged. (--destructive already clears 3.7:1,
+       enough for the bold/large text it's used for, so no -text variant.) */
+    --success-text: #178640;
+    --warning-text: #C55405;
 
     /* Rounded corners — 16px base */
     --radius: 1rem;

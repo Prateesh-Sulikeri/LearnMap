@@ -10,6 +10,7 @@ import { SOCIAL_PLATFORMS } from '@/utils/socialPlatforms'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { StatCard } from '@/components/StatCard'
 import { ProfileStatCard, type ProfileStatCardHandle } from '@/components/profile/ProfileStatCard'
 import { ContributionHeatmap } from '@/components/profile/ContributionHeatmap'
@@ -19,8 +20,16 @@ import { ChangePasswordDialog } from '@/components/profile/ChangePasswordDialog'
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
-  const { data: dashboard } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
-  const { data: heatmap } = useQuery({ queryKey: ['profile-heatmap'], queryFn: profileApi.getHeatmap })
+  const {
+    data: dashboard,
+    isLoading: dashboardLoading,
+    isError: dashboardError,
+  } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get })
+  const {
+    data: heatmap,
+    isLoading: heatmapLoading,
+    isError: heatmapError,
+  } = useQuery({ queryKey: ['profile-heatmap'], queryFn: profileApi.getHeatmap })
   const statCardRef = useRef<ProfileStatCardHandle>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
@@ -58,7 +67,11 @@ export default function ProfilePage() {
         <div className="min-w-0 space-y-6 lg:sticky lg:top-6">
           <Card>
             <CardContent className="flex min-w-0 flex-col items-center gap-3 pt-2 text-center">
-              <ProfileStatCard ref={statCardRef} user={user} dashboard={dashboard} onBadgeClick={() => setAllRanksOpen(true)} />
+              {dashboardLoading ? (
+                <Skeleton className="h-64 w-full rounded-2xl" />
+              ) : (
+                <ProfileStatCard ref={statCardRef} user={user} dashboard={dashboard} onBadgeClick={() => setAllRanksOpen(true)} />
+              )}
 
               {user.bio && <p className="w-full text-sm break-words text-foreground">{user.bio}</p>}
 
@@ -125,24 +138,39 @@ export default function ProfilePage() {
         {/* Right column: real stats, not empty space — top topics and a
             heatmap, both fed by data already being fetched on this page. */}
         <div className="min-w-0 space-y-6">
-          {dashboard && (
-            // auto-fit/minmax reflows based on the actual available width —
-            // not just viewport size — since this grid competes with the
-            // sticky left column and sidebar nav for space, a plain sm:/md:
-            // breakpoint could still land on a too-narrow in-between width.
+          {/* auto-fit/minmax reflows based on the actual available width —
+              not just viewport size — since this grid competes with the
+              sticky left column and sidebar nav for space, a plain sm:/md:
+              breakpoint could still land on a too-narrow in-between width. */}
+          {dashboardLoading ? (
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ) : dashboardError ? (
+            <p className="text-sm text-destructive">Couldn&apos;t load your stats. Try refreshing the page.</p>
+          ) : dashboard ? (
             <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-4">
               <StatCard label="Hours this week" value={dashboard.study_hours_this_week.toFixed(1)} icon={CalendarClock} />
               <StatCard label="Completed" value={String(dashboard.completed_items)} icon={CheckCircle2} />
               <StatCard label="Pending" value={String(dashboard.pending_items)} icon={ListTodo} />
             </div>
-          )}
+          ) : null}
 
           <Card>
             <CardHeader>
               <CardTitle className="font-heading text-base">Top topics</CardTitle>
             </CardHeader>
             <CardContent>
-              {!dashboard || dashboard.top_topics.length === 0 ? (
+              {dashboardLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-5 w-full" />
+                </div>
+              ) : dashboardError ? (
+                <p className="text-sm text-destructive">Couldn&apos;t load your top topics.</p>
+              ) : !dashboard || dashboard.top_topics.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Log a session to see your top topics here.</p>
               ) : (
                 <ul className="space-y-2">
@@ -163,7 +191,13 @@ export default function ProfilePage() {
               <CardDescription>Every day you&apos;ve logged a study session, over the last 12 months.</CardDescription>
             </CardHeader>
             <CardContent>
-              <ContributionHeatmap data={heatmap ?? []} />
+              {heatmapLoading ? (
+                <Skeleton className="h-32 w-full" />
+              ) : heatmapError ? (
+                <p className="text-sm text-destructive">Couldn&apos;t load your activity. Try refreshing the page.</p>
+              ) : (
+                <ContributionHeatmap data={heatmap ?? []} />
+              )}
             </CardContent>
           </Card>
         </div>
