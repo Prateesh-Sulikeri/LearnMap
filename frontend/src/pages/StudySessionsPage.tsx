@@ -9,14 +9,19 @@ import { itemsApi } from '@/services/itemsApi'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
+import { ScheduleSessionDialog } from '@/components/ScheduleSessionDialog'
+import { ConfirmSessionDialog } from '@/components/ConfirmSessionDialog'
 import { DeleteSessionDialog } from '@/components/DeleteSessionDialog'
 import ShadcnBigCalendar from '@/components/shadcn-big-calendar/shadcn-big-calendar'
+import type { StudySession } from '@/types/api'
 
 const localizer = momentLocalizer(moment)
 
 export default function StudySessionsPage() {
   const [addOpen, setAddOpen] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [confirmSession, setConfirmSession] = useState<StudySession | null>(null)
   const [calendarView, setCalendarView] = useState<View>('week')
 
   const {
@@ -41,10 +46,16 @@ export default function StudySessionsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl font-semibold">Study Sessions</h1>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="size-4" />
-          Add Session
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setScheduleOpen(true)}>
+            <Plus className="size-4" />
+            Schedule Session
+          </Button>
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="size-4" />
+            Add Session
+          </Button>
+        </div>
       </div>
 
       {isLoading && (
@@ -82,6 +93,8 @@ export default function StudySessionsPage() {
       )}
 
       <AddSessionDialog open={addOpen} onOpenChange={setAddOpen} />
+      <ScheduleSessionDialog open={scheduleOpen} onOpenChange={setScheduleOpen} />
+      <ConfirmSessionDialog session={confirmSession} open={confirmSession !== null} onOpenChange={(open) => !open && setConfirmSession(null)} />
       {deleteId && (
         <DeleteSessionDialog
           open={deleteId !== null}
