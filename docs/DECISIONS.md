@@ -1,5 +1,19 @@
 # LearnMap.app — Architecture Decision Records
 
+## ADR-023: Dedicated test database, structurally enforced
+
+**Decision:** Backend tests run against a separate `learnmap_test` database in the same Postgres instance, never the `learnmap` database the dev/prod backend actually uses. `internal/testutil.TestDatabaseURL()` defaults to `learnmap_test`; both `SetupTestDB` and `TruncateAll` now hard-refuse (return an error) if the target database's name doesn't contain "test", regardless of what `TEST_DATABASE_URL` is set to.
+
+**Context:** A real incident, not a hypothetical: `TestDatabaseURL()` previously defaulted to the same `learnmap` database `docker-compose.yml`'s `postgres` service and the running backend container both use, and every `go test` run's `TruncateAll` (`TRUNCATE TABLE users, ... CASCADE`) was silently wiping whatever real data existed — confirmed by finding a live user's account gone and the `users` table containing only leftover test-fixture rows (literally `alice@example.com`/`bob@example.com` with a fake `password_hash = "hash"`) after a session of repeated test runs. The data lost this way is not recoverable — `TRUNCATE` isn't a soft delete and this local dev Postgres volume has no backup/snapshot.
+
+**Alternatives considered:** Rely on documentation/convention alone (a comment saying "always use a separate test DB") — insufficient, since this is exactly what was already implicitly assumed and still failed in practice; a fully separate Postgres container just for tests — more isolation but more moving parts (another container to start/stop) for no additional safety over a same-instance separate database, since the actual risk is "wrong database name," not "wrong Postgres instance."
+
+**Reasoning:** A structural guard (reject-by-name at the code level) is enforced regardless of what any future command, script, or CI config passes as `TEST_DATABASE_URL` — it doesn't rely on every future invocation getting a long connection string exactly right by eye, which is precisely the human/process failure that caused the incident. Requiring "test" in the name is a cheap, effective check: real dev/prod database names in this project never contain that substring, and it costs nothing for a genuinely dedicated test database to be named accordingly.
+
+**Status:** Approved and implemented (`backend/internal/testutil/db.go`, `db_test.go`; `backend/README.md`; `.claude/agents/testing-agent.md`).
+
+---
+
 ## ADR-001: Flat list + client-side tree assembly instead of recursive SQL
 
 **Decision:** `GET /items` returns a flat array of all learning items with `parent_id`; the frontend assembles the tree in memory.

@@ -36,7 +36,7 @@ None — Milestone 4 not yet started.
 Milestone 4 — `/stats` wired into Recharts (weekly hours, monthly hours, top topics, completion %), animated, responsive.
 
 ## Known Issues
-None blocking.
+- **Resolved 2026-07-07, but caused real data loss beforehand:** the test suite was silently truncating the live dev database on every run (see ADR-023). A user's account and all its data were wiped as a result. Test/dev database isolation is now structurally enforced — see `docs/DECISIONS.md` ADR-023 — but the specific data lost before the fix is unrecoverable; the account needs to be recreated.
 
 ## Technical Debt
 - Backend isn't containerized yet (Dockerfile) — deferred to Milestone 6.

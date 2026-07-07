@@ -109,17 +109,38 @@ Go installed, where `godotenv.Load()` in `main.go` will pick it up.
 
 ## Running tests
 
+**⚠️ Tests call `TruncateAll`, which wipes every row in the target database
+on every run, with no recovery possible. `TEST_DATABASE_URL` must point at
+a *dedicated test database* (name contains "test") — never the same
+database `DATABASE_URL` uses.** This is not a hypothetical: this project's
+tests once defaulted to the same `learnmap` database the dev backend uses,
+and running them repeatedly silently wiped a real user's account and
+everything in it. `internal/testutil`'s `guardTestDatabaseName` now refuses
+to run against a database whose name doesn't contain "test", as a hard
+backstop — but don't rely on that catching a mistake; get the URL right.
+
+One-time setup — create the dedicated test database (same Postgres
+container, separate database, so it can never collide with dev data):
+
+```bash
+docker exec learnmapapp-postgres-1 psql -U learnmap -d postgres -c "CREATE DATABASE learnmap_test;"
+```
+
 Tests hit a real Postgres, not mocks (project convention — see
-`.claude/agents/testing-agent.md`). Point `TEST_DATABASE_URL` at the
-same Postgres container and run with `-p 1` (parallel package tests
+`.claude/agents/testing-agent.md`). Run with `-p 1` (parallel package tests
 deadlock against the shared test DB):
 
 ```bash
 docker run --rm --network learnmapapp_default \
   -v "$(pwd)/backend:/app" -w /app \
-  -e TEST_DATABASE_URL="postgres://learnmap:learnmap_dev_password@postgres:5432/learnmap?sslmode=disable" \
+  -e TEST_DATABASE_URL="postgres://learnmap:learnmap_dev_password@postgres:5432/learnmap_test?sslmode=disable" \
   golang:latest go test ./... -p 1
 ```
+
+(`TEST_DATABASE_URL` can be omitted entirely — `internal/testutil.TestDatabaseURL()`
+now defaults to `learnmap_test` on `localhost`. Only set it explicitly when
+running from inside a container that needs the `postgres` hostname instead,
+as above — and when you do, double-check the database name before running.)
 
 ## API
 

@@ -1,5 +1,29 @@
 # LearnMap.app — Session Log
 
+## 2026-07-07 — Incident: test suite was wiping the live dev database
+
+**Summary:** User reported their real account kept disappearing, and that `alice`/`bob` rows in the database had no working password. Root-caused immediately: `internal/testutil.TestDatabaseURL()` defaulted to `postgres://.../learnmap` — the exact same database name `docker-compose.yml`'s `postgres` service and the running `learnmap-backend` container both use for real dev data — and every test invocation this session had explicitly passed `TEST_DATABASE_URL` pointing at that same `learnmap` database (copied from `backend/README.md`'s own testing section, which had the same mistake baked into its example command). `TruncateAll` (`TRUNCATE TABLE users, ... CASCADE`) runs at the start of nearly every test, so every `go test` run this session silently wiped whatever real data existed. Confirmed via direct inspection: the live `users` table contained exactly two rows, `alice@example.com`/`bob@example.com` with `password_hash = 'hash'` (a literal fixture string from `learning_item_service_test.go`, not a real bcrypt hash) — the leftovers of whichever test ran last, with the user's actual account already gone.
+
+**This data loss is not recoverable.** `TRUNCATE` isn't a soft delete, and this local Postgres volume has no backup/snapshot.
+
+**Fixed:**
+1. Created a genuinely separate `learnmap_test` database in the same Postgres instance.
+2. `TestDatabaseURL()` now defaults to it instead of `learnmap`.
+3. Added a structural guard, not just a naming convention: `SetupTestDB` and `TruncateAll` now hard-refuse (return an error, don't proceed) if the target database's name doesn't contain "test" — regardless of what `TEST_DATABASE_URL` is ever set to in the future. Added `db_test.go` proving the guard actually rejects the exact URL that caused this incident.
+4. Deleted the two leftover garbage rows from the live database.
+5. Fixed `backend/README.md`'s testing section, which had the same bad connection string in its example command (this is what I'd been copy-pasting all session) — added a one-time `CREATE DATABASE learnmap_test` setup step and a loud warning.
+6. Recorded as ADR-023 (`docs/DECISIONS.md`) and in `.claude/agents/testing-agent.md`'s gotchas list.
+
+**Files created:** `backend/internal/testutil/db_test.go`.
+
+**Files modified:** `backend/internal/testutil/db.go`, `backend/README.md`, `docs/DECISIONS.md`, `docs/PROJECT_STATUS.md`, `.claude/agents/testing-agent.md`.
+
+**Verification:** Ran the full test suite against the new `learnmap_test` database (all green) and confirmed the live `learnmap` database's `users` table stayed at 0 rows afterward — the isolation actually holds, not just in theory.
+
+**Next recommended task:** The user needs to re-register their account (and recreate anything they'd built) — there is no way to restore what was wiped. Going forward, any test invocation must use the corrected command in `backend/README.md`, and the guard will now hard-fail loudly if it doesn't.
+
+---
+
 ## 2026-07-07 — Post-Milestone-3 UX/feature pass
 
 **Summary:** User tested the running Milestone-3 build directly and drove a long series of UX corrections and feature requests across several turns, rather than a formal milestone kickoff. Landed in three rounds (each verified and committed separately): (1) revert action icons back to a dropdown with icon+text and a descriptive tooltip, darken/fix the tree connector lines (single bordered box instead of two misaligned spans, giving the last child a curved ending), build a new top-down org-chart tree, restructure Study Sessions, add a recycle bin end to end (backend + Trash page); (2) after feedback that the org-chart didn't scale and the global search bar was pointless everywhere but Learning: removed the global search bar, added a List/Map toggle to the Learning page (org-chart nodes gained full edit parity — status toggle, actions dropdown), reverted Sessions to single-column; (3) Active/Completed tabs (root-level completion only), notes made editable via a popover, red trash styling, fixed a `min-w-0` scroll-containment bug; (4) a `/plan`-mode design pass (3 parallel Explore agents + 1 Plan agent) for a bigger batch: root topics' notes auto-generate a table of contents linking to sub-topics' own notes, a full markdown+toolbar+image-upload notes editor in a large dialog (replacing the small popover), Active-tab icon parity, FAB tooltip, org-chart scroll-pinning, and an "insta-worthy" Profile stat card exportable as an image.
