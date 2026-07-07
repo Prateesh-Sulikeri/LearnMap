@@ -79,9 +79,11 @@ export default function StudySessionsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* flex-col on mobile — title + two buttons on one row overflowed the
+          viewport (the buttons pushed off-screen while the title wrapped). */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-heading text-xl font-semibold">Study Sessions</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setScheduleOpen(true)}>
             <Plus className="size-4" />
             Schedule Session
