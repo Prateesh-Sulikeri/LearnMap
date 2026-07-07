@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { List, ListTree, Search, Trash2, Workflow } from 'lucide-react'
+import { CircleCheck, List, ListTree, Search, Trash2, Workflow } from 'lucide-react'
 import { useLearningTree } from '@/hooks/useLearningTree'
 import { useCollapsedState } from '@/hooks/useCollapsedState'
 import { useTreeViewMode } from '@/hooks/useTreeViewMode'
@@ -13,7 +13,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
+type MapTab = 'active' | 'completed'
+
 export default function LearningTreePage() {
+  const [tab, setTab] = useState<MapTab>('active')
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useTreeViewMode()
   const { tree, isLoading, isError } = useLearningTree()
@@ -45,10 +48,38 @@ export default function LearningTreePage() {
     )
   }
 
-  const visibleTree = searchQuery.trim() ? tree.filter((node) => nodeMatchesSearch(node, searchQuery)) : tree
+  // Only a completed *top-level* topic moves to the Completed tab — a
+  // completed sub-item under an still-active parent stays put, since the
+  // parent as a whole isn't done.
+  const completedCount = tree.filter((node) => node.status === 'completed').length
+  const tabTree = tree.filter((node) => (tab === 'completed') === (node.status === 'completed'))
+  const visibleTree = searchQuery.trim() ? tabTree.filter((node) => nodeMatchesSearch(node, searchQuery)) : tabTree
 
   return (
     <div className="space-y-4">
+      <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border p-0.5 md:w-fit">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={cn('gap-1.5', tab === 'active' && 'bg-accent text-accent-foreground')}
+          onClick={() => setTab('active')}
+        >
+          Active
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={cn('gap-1.5', tab === 'completed' && 'bg-accent text-accent-foreground')}
+          onClick={() => setTab('completed')}
+        >
+          <CircleCheck className="size-4" />
+          Completed
+          {completedCount > 0 && <span className="font-mono text-xs text-muted-foreground">{completedCount}</span>}
+        </Button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative max-w-sm flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -90,7 +121,7 @@ export default function LearningTreePage() {
               <Link
                 to="/trash"
                 aria-label="Trash"
-                className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-accent-foreground"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-destructive transition-colors duration-150 hover:bg-destructive/10"
               />
             }
           >
@@ -100,7 +131,11 @@ export default function LearningTreePage() {
         </Tooltip>
       </div>
 
-      {visibleTree.length === 0 ? (
+      {tabTree.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {tab === 'completed' ? "You haven't completed any top-level topics yet." : 'Nothing in progress — check the Completed tab.'}
+        </p>
+      ) : visibleTree.length === 0 ? (
         <p className="text-sm text-muted-foreground">No items match &quot;{searchQuery}&quot;.</p>
       ) : viewMode === 'list' ? (
         <ul className="space-y-0.5">

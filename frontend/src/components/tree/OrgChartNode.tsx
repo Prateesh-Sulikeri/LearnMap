@@ -71,7 +71,7 @@ export function OrgChartNode({ node, isCollapsed, onToggle }: OrgChartNodeProps)
           {node.title}
         </button>
 
-        {node.description && <NoteIndicator note={node.description} />}
+        {node.description && <NoteIndicator itemId={node.id} note={node.description} />}
 
         {hasChildren && (
           <span className="font-mono text-xs text-muted-foreground">

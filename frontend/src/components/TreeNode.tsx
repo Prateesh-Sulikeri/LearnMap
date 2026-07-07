@@ -105,7 +105,7 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, isLast, ancestorL
           >
             {node.title}
           </button>
-          {node.description && <NoteIndicator note={node.description} />}
+          {node.description && <NoteIndicator itemId={node.id} note={node.description} />}
         </div>
 
         <Tooltip>

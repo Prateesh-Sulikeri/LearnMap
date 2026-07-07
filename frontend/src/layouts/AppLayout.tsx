@@ -133,7 +133,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col pb-20 md:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
         {/* Top bar: breadcrumb — present on every page */}
         <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
           <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
@@ -142,7 +142,7 @@ export default function AppLayout() {
           </nav>
         </header>
 
-        <main className="flex-1 px-4 py-6 md:px-8">
+        <main className="min-w-0 flex-1 px-4 py-6 md:px-8">
           <Outlet />
         </main>
       </div>

@@ -36,7 +36,10 @@ export default function TrashPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="font-heading text-xl font-semibold">Trash</h1>
+        <h1 className="flex items-center gap-2 font-heading text-xl font-semibold">
+          <Trash2 className="size-5 text-destructive" />
+          Trash
+        </h1>
         <p className="text-sm text-muted-foreground">
           Deleting an item also deletes its sub-items — restoring it brings them all back together.
         </p>
@@ -57,9 +60,12 @@ export default function TrashPage() {
               key={item.id}
               className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{item.title}</p>
-                <p className="text-xs text-muted-foreground">Deleted {new Date(item.deleted_at).toLocaleString()}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <Trash2 className="size-4 shrink-0 text-destructive" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">Deleted {new Date(item.deleted_at).toLocaleString()}</p>
+                </div>
               </div>
               <Button variant="outline" size="sm" onClick={() => restore.mutate(item.id)} disabled={restore.isPending}>
                 Restore

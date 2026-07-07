@@ -33,6 +33,7 @@ export function DeleteItemDialog({ open, onOpenChange, itemId, itemTitle, hasChi
     onSuccess: ({ deleted_count }) => {
       void queryClient.invalidateQueries({ queryKey: ['items'] })
       void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      void queryClient.invalidateQueries({ queryKey: ['trash'] })
       toast.success(deleted_count > 1 ? `Deleted ${deleted_count} items` : 'Deleted')
       onOpenChange(false)
     },
