@@ -46,7 +46,7 @@ export function SessionDetailsDialog({
   const sessionDate = new Date(session.session_date)
   const startTime = session.scheduled_start ? new Date(session.scheduled_start) : null
   const endTime = session.scheduled_end ? new Date(session.scheduled_end) : null
-  const isPending = session.scheduled_end && !session.confirmed_at
+  const isPending = Boolean(session.scheduled_end) && !session.confirmed_at
   const isExpired = isPending && new Date() > endTime!
 
   return (
@@ -60,9 +60,32 @@ export function SessionDetailsDialog({
         <div className="space-y-4">
           {/* Time/Date Information */}
           <div className="space-y-2 rounded-lg bg-muted p-3">
-            {startTime && endTime ? (
+            {isPending ? (
               <>
                 <p className="text-xs font-semibold text-muted-foreground">SCHEDULED</p>
+                <p className="text-sm">
+                  {startTime!.toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                  {' — '}
+                  {endTime!.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+                {isExpired && (
+                  <p className="text-xs text-destructive font-semibold">EXPIRED - Not confirmed</p>
+                )}
+                {!isExpired && (
+                  <p className="text-xs text-warning font-semibold">PENDING - Awaiting confirmation</p>
+                )}
+              </>
+            ) : startTime && endTime ? (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground">LOGGED</p>
                 <p className="text-sm">
                   {startTime.toLocaleString('en-US', {
                     month: 'short',
@@ -76,12 +99,6 @@ export function SessionDetailsDialog({
                     minute: '2-digit',
                   })}
                 </p>
-                {isExpired && (
-                  <p className="text-xs text-destructive font-semibold">EXPIRED - Not confirmed</p>
-                )}
-                {isPending && !isExpired && (
-                  <p className="text-xs text-warning font-semibold">PENDING - Awaiting confirmation</p>
-                )}
               </>
             ) : (
               <>
