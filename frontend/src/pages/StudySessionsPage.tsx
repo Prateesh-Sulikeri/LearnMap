@@ -4,17 +4,11 @@ import { CalendarClock, Plus, Trash2 } from 'lucide-react'
 import { sessionsApi } from '@/services/sessionsApi'
 import { itemsApi } from '@/services/itemsApi'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
 import { DeleteSessionDialog } from '@/components/DeleteSessionDialog'
-import { OrgChartTree } from '@/components/tree/OrgChartTree'
 
-// A 2-part screen: session logging on the left, a top-down progress-by-topic
-// tree on the right — side by side once there's room (lg+), stacked on
-// anything narrower. The tree owns its own horizontal scroll (org-chart
-// diagrams can get wide), so it never fights this page's layout.
 export default function StudySessionsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -29,83 +23,72 @@ export default function StudySessionsPage() {
   const titleByItemId = new Map(items.map((item) => [item.id, item.title]))
 
   return (
-    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="font-heading text-xl font-semibold">Study Sessions</h1>
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="size-4" />
-            Add Session
-          </Button>
-        </div>
-
-        {isLoading && (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        )}
-
-        {isError && (
-          <p className="text-sm text-destructive">Couldn&apos;t load your sessions. Try refreshing the page.</p>
-        )}
-
-        {sessions && sessions.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-16 text-center">
-            <CalendarClock className="size-10 text-muted-foreground" />
-            <h2 className="font-heading text-lg font-semibold">No study sessions yet</h2>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              Log your first session to start building your streak.
-            </p>
-          </div>
-        )}
-
-        {sessions && sessions.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Topic</TableHead>
-                  <TableHead className="text-right">Hours</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sessions.map((session) => (
-                  <TableRow key={session.id}>
-                    <TableCell className="font-mono text-sm whitespace-nowrap">{session.session_date}</TableCell>
-                    <TableCell>{titleByItemId.get(session.learning_item_id) ?? 'Unknown'}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">{session.hours}</TableCell>
-                    <TableCell className="max-w-xs truncate text-muted-foreground">{session.notes ?? '—'}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        aria-label="Delete session"
-                        onClick={() => setDeleteId(session.id)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="font-heading text-xl font-semibold">Study Sessions</h1>
+        <Button onClick={() => setAddOpen(true)}>
+          <Plus className="size-4" />
+          Add Session
+        </Button>
       </div>
 
-      <Card className="lg:sticky lg:top-20">
-        <CardHeader>
-          <CardTitle className="font-heading text-base">Progress by topic</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <OrgChartTree />
-        </CardContent>
-      </Card>
+      {isLoading && (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      )}
+
+      {isError && (
+        <p className="text-sm text-destructive">Couldn&apos;t load your sessions. Try refreshing the page.</p>
+      )}
+
+      {sessions && sessions.length === 0 && (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-16 text-center">
+          <CalendarClock className="size-10 text-muted-foreground" />
+          <h2 className="font-heading text-lg font-semibold">No study sessions yet</h2>
+          <p className="max-w-xs text-sm text-muted-foreground">
+            Log your first session to start building your streak.
+          </p>
+        </div>
+      )}
+
+      {sessions && sessions.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Topic</TableHead>
+                <TableHead className="text-right">Hours</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.map((session) => (
+                <TableRow key={session.id}>
+                  <TableCell className="font-mono text-sm whitespace-nowrap">{session.session_date}</TableCell>
+                  <TableCell>{titleByItemId.get(session.learning_item_id) ?? 'Unknown'}</TableCell>
+                  <TableCell className="text-right font-mono text-sm">{session.hours}</TableCell>
+                  <TableCell className="max-w-xs truncate text-muted-foreground">{session.notes ?? '—'}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      aria-label="Delete session"
+                      onClick={() => setDeleteId(session.id)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <AddSessionDialog open={addOpen} onOpenChange={setAddOpen} />
       {deleteId && (

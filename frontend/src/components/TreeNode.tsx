@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { TreeGuides } from '@/components/tree/TreeGuides'
+import { NoteIndicator } from '@/components/tree/NoteIndicator'
 import { ItemFormDialog } from '@/components/ItemFormDialog'
 import { DeleteItemDialog } from '@/components/DeleteItemDialog'
 import { AddSessionDialog } from '@/components/AddSessionDialog'
@@ -104,6 +105,7 @@ export function TreeNode({ node, depth, isCollapsed, onToggle, isLast, ancestorL
           >
             {node.title}
           </button>
+          {node.description && <NoteIndicator note={node.description} />}
         </div>
 
         <Tooltip>

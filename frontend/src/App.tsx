@@ -8,6 +8,7 @@ import DashboardPage from '@/pages/DashboardPage'
 import LearningTreePage from '@/pages/LearningTreePage'
 import StudySessionsPage from '@/pages/StudySessionsPage'
 import ProfilePage from '@/pages/ProfilePage'
+import TrashPage from '@/pages/TrashPage'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/tree" element={<LearningTreePage />} />
           <Route path="/sessions" element={<StudySessionsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/trash" element={<TrashPage />} />
         </Route>
       </Route>
 

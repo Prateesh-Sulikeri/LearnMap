@@ -3,7 +3,9 @@ import type {
   CreateItemRequest,
   DeleteItemResponse,
   LearningItem,
+  RestoreItemResponse,
   SetStatusRequest,
+  TrashedItem,
   UpdateItemRequest,
 } from '@/types/api'
 
@@ -17,4 +19,7 @@ export const itemsApi = {
     apiClient.patch<LearningItem>(`/items/${id}/status`, data).then((r) => r.data),
   remove: (id: string) =>
     apiClient.delete<DeleteItemResponse>(`/items/${id}`).then((r) => r.data),
+  listTrash: () => apiClient.get<TrashedItem[]>('/items/trash').then((r) => r.data),
+  restore: (id: string) =>
+    apiClient.post<RestoreItemResponse>(`/items/${id}/restore`).then((r) => r.data),
 }

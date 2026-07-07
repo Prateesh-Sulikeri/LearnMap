@@ -67,6 +67,19 @@ export interface DeleteItemResponse {
   deleted_count: number
 }
 
+export interface TrashedItem {
+  id: string
+  parent_id: string | null
+  title: string
+  description: string | null
+  status: LearningItemStatus
+  deleted_at: string
+}
+
+export interface RestoreItemResponse {
+  restored_count: number
+}
+
 export interface StudySession {
   id: string
   learning_item_id: string

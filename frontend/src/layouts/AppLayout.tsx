@@ -8,11 +8,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Search,
   UserRound,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/useAuth'
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed'
@@ -31,18 +29,19 @@ const PAGE_TITLES: Record<string, string> = {
   '/tree': 'Learning',
   '/sessions': 'Study Sessions',
   '/profile': 'Profile',
+  '/trash': 'Trash',
 }
 
 // The one layout every authenticated page renders inside. Per the design
-// doc, every page needs a search bar, a breadcrumb, and a floating add
-// button — all three live here, not per-page, so they can't drift out of
-// sync across pages. Responsive: a left sidebar on tablet/desktop (collapsible
-// to icon-only width for more content room) becomes a bottom tab bar on
-// phone widths (mobile-first requirement, ADR-012).
+// doc, every page needs a breadcrumb and a floating add button — both live
+// here, not per-page, so they can't drift out of sync across pages. Search
+// is page-local (only the Learning page has anything to search), not global
+// chrome. Responsive: a left sidebar on tablet/desktop (collapsible to
+// icon-only width for more content room) becomes a bottom tab bar on phone
+// widths (mobile-first requirement, ADR-012).
 export default function AppLayout() {
   const location = useLocation()
   const { logout, user } = useAuth()
-  const [searchQuery, setSearchQuery] = useState('')
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed()
 
@@ -135,26 +134,16 @@ export default function AppLayout() {
       </aside>
 
       <div className="flex flex-1 flex-col pb-20 md:pb-0">
-        {/* Top bar: breadcrumb + search — present on every page */}
+        {/* Top bar: breadcrumb — present on every page */}
         <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
-          <nav aria-label="Breadcrumb" className="mb-1 text-xs text-muted-foreground">
+          <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
             <span>LearnMap</span> <span className="mx-1">/</span>{' '}
             <span className="text-foreground">{currentTitle}</span>
           </nav>
-          <div className="relative max-w-sm">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search your learning items…"
-              className="pl-8"
-              aria-label="Search"
-            />
-          </div>
         </header>
 
         <main className="flex-1 px-4 py-6 md:px-8">
-          <Outlet context={{ searchQuery } satisfies AppOutletContext} />
+          <Outlet />
         </main>
       </div>
 
@@ -187,8 +176,4 @@ export default function AppLayout() {
       <ItemFormDialog open={quickAddOpen} onOpenChange={setQuickAddOpen} mode="create" />
     </div>
   )
-}
-
-export interface AppOutletContext {
-  searchQuery: string
 }
