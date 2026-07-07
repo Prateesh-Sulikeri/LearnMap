@@ -44,17 +44,18 @@ func TestComputeStreak(t *testing.T) {
 // must still get a non-nil slice here — a nil slice marshals to JSON `null`,
 // and the frontend calls `.length` on this field unconditionally, which
 // crashes the whole page on `null` (this was a real bug, not hypothetical).
-func TestBuildRecentActivity_NonNilWhenBothInputsEmpty(t *testing.T) {
-	activity := buildRecentActivity(nil, nil)
+func TestBuildAdaptiveRecentActivity_NonNilWhenBothInputsEmpty(t *testing.T) {
+	now := time.Now()
+	activity := buildAdaptiveRecentActivity(nil, nil, now)
 	if activity == nil {
-		t.Fatal("buildRecentActivity(nil, nil) returned a nil slice — will serialize as JSON null")
+		t.Fatal("buildAdaptiveRecentActivity(nil, nil, now) returned a nil slice — will serialize as JSON null")
 	}
 	if len(activity) != 0 {
 		t.Fatalf("expected empty activity, got %d entries", len(activity))
 	}
 
-	activity = buildRecentActivity([]models.LearningItem{}, []models.StudySession{})
+	activity = buildAdaptiveRecentActivity([]models.LearningItem{}, []models.StudySession{}, now)
 	if activity == nil {
-		t.Fatal("buildRecentActivity with empty (non-nil) slices returned a nil slice")
+		t.Fatal("buildAdaptiveRecentActivity with empty (non-nil) slices returned a nil slice")
 	}
 }

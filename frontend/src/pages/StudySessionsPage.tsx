@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarClock, Plus } from 'lucide-react'
 import moment from 'moment'
@@ -44,12 +44,17 @@ export default function StudySessionsPage() {
   const titleByItemId = new Map(items.map((item) => [item.id, item.title]))
 
   const calendarEvents = (sessions ?? []).map((session) => {
-    const start = new Date(session.session_date)
+    // Prefer real time-of-day when available (logged-with-times or scheduled
+    // sessions); fall back to midnight + hours for old-style hours-only logs.
+    const start = session.scheduled_start ? new Date(session.scheduled_start) : new Date(session.session_date)
+    const end = session.scheduled_end
+      ? new Date(session.scheduled_end)
+      : new Date(start.getTime() + session.hours * 60 * 60 * 1000)
     return {
       id: session.id,
       title: `${titleByItemId.get(session.learning_item_id) ?? 'Unknown'} (${session.hours}h)`,
       start,
-      end: new Date(start.getTime() + session.hours * 60 * 60 * 1000),
+      end,
       resource: session,
     }
   })
@@ -69,22 +74,6 @@ export default function StudySessionsPage() {
   const getTopicTitle = (session: StudySession) => {
     return titleByItemId.get(session.learning_item_id) || 'Unknown Topic'
   }
-
-  // Scroll calendar to current time on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // Scroll to current hour in day/week view
-      const hourElement = document.querySelector('[data-time-slot]')
-      if (hourElement) {
-        const currentHour = new Date().getHours()
-        const scrollTarget = document.querySelector(`[data-time="${currentHour}:00"]`)
-        if (scrollTarget) {
-          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-      }
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [calendarView])
 
   return (
     <div className="space-y-4">
@@ -124,6 +113,7 @@ export default function StudySessionsPage() {
               onView={setCalendarView}
               date={calendarDate}
               onNavigate={setCalendarDate}
+              scrollToTime={new Date()}
               style={{ height: 650 }}
               eventPropGetter={() => ({ className: 'event-variant-primary cursor-pointer' })}
               onSelectEvent={(event) => {

@@ -25,6 +25,13 @@ type CreateSessionInput struct {
 	Hours          float64
 	Notes          *string
 	SessionDate    time.Time
+	// ScheduledStart/ScheduledEnd are optional time-of-day info for a
+	// retroactive log (e.g. "9am-11am" instead of just "2 hours"). When set,
+	// the session is stored pre-confirmed (ConfirmedAt = now) since logging
+	// something after the fact means it already happened — unlike
+	// CreateScheduled, which reserves a future block pending confirmation.
+	ScheduledStart *time.Time
+	ScheduledEnd   *time.Time
 }
 
 type CreateScheduledSessionInput struct {
@@ -57,6 +64,12 @@ func (s *StudySessionService) Create(userID uuid.UUID, input CreateSessionInput)
 		Hours:          input.Hours,
 		Notes:          input.Notes,
 		SessionDate:    input.SessionDate,
+		ScheduledStart: input.ScheduledStart,
+		ScheduledEnd:   input.ScheduledEnd,
+	}
+	if input.ScheduledStart != nil && input.ScheduledEnd != nil {
+		now := time.Now()
+		session.ConfirmedAt = &now
 	}
 	if err := s.sessions.Create(session); err != nil {
 		return nil, err
@@ -94,8 +107,11 @@ func (s *StudySessionService) Delete(userID, sessionID uuid.UUID) error {
 // CreateScheduled reserves a future time block for a topic (honor system).
 // ScheduledEnd and ScheduledStart define the time window; no Hours/SessionDate yet.
 func (s *StudySessionService) CreateScheduled(userID uuid.UUID, input CreateScheduledSessionInput) (*models.StudySession, error) {
-	if input.ScheduledEnd.Before(input.ScheduledStart) {
+	if !input.ScheduledEnd.After(input.ScheduledStart) {
 		return nil, apperror.Validation("scheduled_end must be after scheduled_start", map[string]string{"scheduled_end": "invalid range"})
+	}
+	if input.ScheduledStart.Before(time.Now()) {
+		return nil, apperror.Validation("scheduled_start must be in the future", map[string]string{"scheduled_start": "cannot schedule in the past"})
 	}
 
 	item, err := s.items.GetByID(userID, input.LearningItemID)

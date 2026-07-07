@@ -21,21 +21,36 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-const sessionFormSchema = z.object({
-  learningItemId: z.string().min(1, 'Pick a topic'),
-  hours: z.coerce.number().gt(0, 'Must be more than 0').max(24, 'Must be 24 or less'),
-  sessionDate: z.string().min(1, 'Pick a date'),
-  notes: z.string().optional(),
-})
-// z.coerce.number() means the form's raw input value (a string, from a
-// native <input type="number">) differs from the validated output value
-// (a number) — RHF needs both: the input shape for field state, the output
-// shape for what the submit handler receives.
+const sessionFormSchema = z
+  .object({
+    learningItemId: z.string().min(1, 'Pick a topic'),
+    sessionStart: z.string().min(1, 'Pick a start time'),
+    sessionEnd: z.string().min(1, 'Pick an end time'),
+    notes: z.string().optional(),
+  })
+  .refine((data) => new Date(data.sessionStart) < new Date(data.sessionEnd), {
+    message: 'End time must be after start time',
+    path: ['sessionEnd'],
+  })
+  .refine((data) => new Date(data.sessionEnd) <= new Date(), {
+    message: "Can't log a session that hasn't happened yet — use Schedule Session for that",
+    path: ['sessionEnd'],
+  })
+  .refine(
+    (data) => (new Date(data.sessionEnd).getTime() - new Date(data.sessionStart).getTime()) / 3_600_000 <= 24,
+    { message: 'A single session can be at most 24 hours', path: ['sessionEnd'] },
+  )
+
 type SessionFormInput = z.input<typeof sessionFormSchema>
 type SessionFormValues = z.output<typeof sessionFormSchema>
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
+function formatDateTimeLocal(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${d}T${h}:${min}`
 }
 
 interface AddSessionDialogProps {
@@ -54,21 +69,42 @@ export function AddSessionDialog({ open, onOpenChange, defaultItemId }: AddSessi
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<SessionFormInput, unknown, SessionFormValues>({ resolver: zodResolver(sessionFormSchema) })
 
   useEffect(() => {
-    if (open) reset({ sessionDate: today(), learningItemId: defaultItemId ?? '', notes: '' })
+    if (open) {
+      const end = new Date()
+      const start = new Date(end.getTime() - 60 * 60 * 1000)
+      reset({
+        learningItemId: defaultItemId ?? '',
+        sessionStart: formatDateTimeLocal(start),
+        sessionEnd: formatDateTimeLocal(end),
+        notes: '',
+      })
+    }
   }, [open, defaultItemId, reset])
 
+  const sessionStart = watch('sessionStart')
+  const sessionEnd = watch('sessionEnd')
+  const computedHours =
+    sessionStart && sessionEnd
+      ? Math.max(0, (new Date(sessionEnd).getTime() - new Date(sessionStart).getTime()) / 3_600_000)
+      : 0
+
   const mutation = useMutation({
-    mutationFn: (values: SessionFormValues) =>
-      sessionsApi.create({
+    mutationFn: (values: SessionFormValues) => {
+      const start = new Date(values.sessionStart)
+      const end = new Date(values.sessionEnd)
+      return sessionsApi.create({
         learning_item_id: values.learningItemId,
-        hours: values.hours,
-        session_date: values.sessionDate,
+        session_date: formatDateTimeLocal(start).slice(0, 10),
+        scheduled_start: start.toISOString(),
+        scheduled_end: end.toISOString(),
         notes: values.notes || undefined,
-      }),
+      })
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessions'] })
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
@@ -117,24 +153,21 @@ export function AddSessionDialog({ open, onOpenChange, defaultItemId }: AddSessi
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="session-hours">Hours</Label>
-              <Input
-                id="session-hours"
-                type="number"
-                step="0.25"
-                min="0.25"
-                max="24"
-                className="[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                {...register('hours')}
-              />
-              {errors.hours && <p className="text-sm text-destructive">{errors.hours.message}</p>}
+              <Label htmlFor="session-start">Start</Label>
+              <Input id="session-start" type="datetime-local" {...register('sessionStart')} />
+              {errors.sessionStart && <p className="text-sm text-destructive">{errors.sessionStart.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="session-date">Date</Label>
-              <Input id="session-date" type="date" {...register('sessionDate')} />
-              {errors.sessionDate && <p className="text-sm text-destructive">{errors.sessionDate.message}</p>}
+              <Label htmlFor="session-end">End</Label>
+              <Input id="session-end" type="datetime-local" {...register('sessionEnd')} />
+              {errors.sessionEnd && <p className="text-sm text-destructive">{errors.sessionEnd.message}</p>}
             </div>
           </div>
+          {computedHours > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {computedHours.toFixed(2)} hour{computedHours === 1 ? '' : 's'}
+            </p>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="session-notes">Notes (optional)</Label>
