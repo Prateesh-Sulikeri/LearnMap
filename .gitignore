@@ -22,3 +22,6 @@ npm-debug.log*
 
 # Claude Code session state (ephemeral, machine-specific)
 .claude/scheduled_tasks.lock
+
+# graphify (generated knowledge-graph cache)
+graphify-out/
